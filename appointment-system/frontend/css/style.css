@@ -21,7 +21,7 @@
 html { scroll-behavior: smooth; }
 
 body {
-    font-family: 'Lora', Georgia, 'Noto Serif SC', serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, 'Noto Serif SC', serif;
     background: var(--light);
     color: var(--dark);
     line-height: 1.7;
@@ -30,7 +30,7 @@ body {
 }
 
 h1, h2, h3, h4, .nav-logo, .btn, .stat-number, .step-number {
-    font-family: 'Poppins', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-weight: 700;
     letter-spacing: -0.02em;
 }
@@ -982,6 +982,27 @@ h1, h2, h3, h4, .nav-logo, .btn, .stat-number, .step-number {
 .form-row .form-group { flex: 1; }
 .form-error { color: #EF4444; font-size: 0.85rem; margin-bottom: 12px; min-height: 20px; }
 .form-footer { text-align: center; margin-top: 16px; font-size: 0.9rem; color: var(--mid-gray); }
+.form-hint { font-size: 0.75rem; color: var(--mid-gray); margin-top: 4px; }
+.form-status { font-size: 0.8rem; margin-top: 4px; min-height: 20px; }
+.form-status.valid { color: var(--green); }
+.form-status.invalid { color: #EF4444; }
+.form-status.checking { color: var(--orange); }
+.form-row { display: flex; gap: 16px; align-items: center; }
+.form-row .form-group { flex: 1; }
+.form-link { font-size: 0.85rem; color: var(--blue); text-decoration: none; }
+.form-link:hover { text-decoration: underline; }
+.checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--mid-gray); }
+.checkbox-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+.checkbox-label span { flex: 1; }
+
+.password-strength { margin-top: 8px; }
+.strength-bar { display: flex; gap: 4px; height: 6px; margin-bottom: 4px; }
+.strength-segment { flex: 1; border-radius: 3px; background: var(--light-gray); transition: background 0.3s; }
+.strength-segment.weak { background: #EF4444; }
+.strength-segment.fair { background: var(--orange); }
+.strength-segment.good { background: #F59E0B; }
+.strength-segment.strong { background: var(--green); }
+.strength-text { font-size: 0.75rem; color: var(--mid-gray); }
 
 /* ==================== Modal ==================== */
 .modal {

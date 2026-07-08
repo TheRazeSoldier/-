@@ -8,6 +8,7 @@ public:
     static DatabaseService& getInstance();
     bool init(const std::string& dbPath);
     void close();
+    void createDefaultAdmin();
 
     // Users
     int createUser(const models::User& user);

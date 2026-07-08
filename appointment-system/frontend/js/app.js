@@ -231,26 +231,214 @@ function goBack() {
 }
 
 // ==================== Auth ====================
+function validateUsername() {
+    const username = $('regUsername').value.trim();
+    const statusEl = $('usernameStatus');
+    if (!username) {
+        statusEl.textContent = '';
+        statusEl.className = 'form-status';
+        return false;
+    }
+    if (username.length < 3) {
+        statusEl.textContent = '用户名至少3个字符';
+        statusEl.className = 'form-status invalid';
+        return false;
+    }
+    if (username.length > 50) {
+        statusEl.textContent = '用户名不能超过50个字符';
+        statusEl.className = 'form-status invalid';
+        return false;
+    }
+    if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(username)) {
+        statusEl.textContent = '用户名只支持中英文、数字和下划线';
+        statusEl.className = 'form-status invalid';
+        return false;
+    }
+    statusEl.textContent = '✓ 用户名可用';
+    statusEl.className = 'form-status valid';
+    return true;
+}
+
+function validateEmail() {
+    const email = $('regEmail').value.trim();
+    const statusEl = $('emailStatus');
+    if (!email) {
+        statusEl.textContent = '';
+        statusEl.className = 'form-status';
+        return false;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        statusEl.textContent = '请输入有效的邮箱地址';
+        statusEl.className = 'form-status invalid';
+        return false;
+    }
+    statusEl.textContent = '✓ 邮箱格式正确';
+    statusEl.className = 'form-status valid';
+    return true;
+}
+
+function validatePassword() {
+    const password = $('regPassword').value;
+    const strength1 = $('strength1');
+    const strength2 = $('strength2');
+    const strength3 = $('strength3');
+    const strength4 = $('strength4');
+    const strengthText = $('strengthText');
+    
+    [strength1, strength2, strength3, strength4].forEach(el => {
+        if (el) el.className = 'strength-segment';
+    });
+    
+    if (!password) {
+        strengthText.textContent = '请输入密码';
+        return 0;
+    }
+    
+    let score = 0;
+    if (password.length >= 6) score++;
+    if (password.length >= 10) score++;
+    if (/[a-zA-Z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^a-zA-Z0-9]/.test(password)) score++;
+    
+    for (let i = 0; i < Math.min(score, 4); i++) {
+        const segments = [strength1, strength2, strength3, strength4];
+        if (segments[i]) {
+            if (score <= 1) segments[i].className = 'strength-segment weak';
+            else if (score <= 2) segments[i].className = 'strength-segment fair';
+            else if (score <= 3) segments[i].className = 'strength-segment good';
+            else segments[i].className = 'strength-segment strong';
+        }
+    }
+    
+    if (score <= 1) strengthText.textContent = '弱 - 建议使用更长的密码';
+    else if (score <= 2) strengthText.textContent = '一般 - 建议添加数字';
+    else if (score <= 3) strengthText.textContent = '良好 - 建议添加特殊字符';
+    else strengthText.textContent = '强 - 密码强度优秀';
+    
+    return score;
+}
+
+function validateConfirmPassword() {
+    const password = $('regPassword').value;
+    const confirmPassword = $('regConfirmPassword').value;
+    const statusEl = $('confirmPasswordStatus');
+    
+    if (!confirmPassword) {
+        statusEl.textContent = '';
+        statusEl.className = 'form-status';
+        return false;
+    }
+    
+    if (password !== confirmPassword) {
+        statusEl.textContent = '两次输入的密码不一致';
+        statusEl.className = 'form-status invalid';
+        return false;
+    }
+    
+    statusEl.textContent = '✓ 密码一致';
+    statusEl.className = 'form-status valid';
+    return true;
+}
+
+function validatePhone() {
+    const phone = $('regPhone').value.trim();
+    const statusEl = $('phoneStatus');
+    
+    if (!phone) {
+        statusEl.textContent = '';
+        statusEl.className = 'form-status';
+        return true;
+    }
+    
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
+        statusEl.textContent = '请输入有效的手机号';
+        statusEl.className = 'form-status invalid';
+        return false;
+    }
+    
+    statusEl.textContent = '✓ 手机号格式正确';
+    statusEl.className = 'form-status valid';
+    return true;
+}
+
+function onRoleChange() {
+    const role = $('regRole').value;
+    const phoneHint = $('phoneHint');
+    if (role === 'provider') {
+        phoneHint.textContent = '服务商请填写真实手机号，便于审核联系';
+    } else {
+        phoneHint.textContent = '用于接收验证码和通知';
+    }
+}
+
 function handleRegister(e) {
     e.preventDefault();
     const errorEl = $('registerError');
     errorEl.textContent = '';
     
+    const username = $('regUsername').value.trim();
+    const email = $('regEmail').value.trim();
+    const password = $('regPassword').value;
+    const confirmPassword = $('regConfirmPassword').value;
+    const phone = $('regPhone').value.trim();
+    const role = $('regRole').value;
+    const agreeTerms = $('agreeTerms').checked;
+    
+    if (!validateUsername()) {
+        errorEl.textContent = '请检查用户名格式';
+        return;
+    }
+    if (!validateEmail()) {
+        errorEl.textContent = '请检查邮箱格式';
+        return;
+    }
+    if (password.length < 6) {
+        errorEl.textContent = '密码至少6个字符';
+        return;
+    }
+    if (!validateConfirmPassword()) {
+        errorEl.textContent = '两次输入的密码不一致';
+        return;
+    }
+    if (phone && !validatePhone()) {
+        errorEl.textContent = '请检查手机号格式';
+        return;
+    }
+    if (!agreeTerms) {
+        errorEl.textContent = '请先阅读并同意服务条款';
+        return;
+    }
+    
+    const btn = $('registerBtn');
+    const btnText = $('registerBtnText');
+    const btnLoading = $('registerBtnLoading');
+    if (btn) btn.disabled = true;
+    if (btnText) btnText.style.display = 'none';
+    if (btnLoading) btnLoading.style.display = 'inline';
+    
     const data = {
-        username: $('regUsername').value.trim(),
-        email: $('regEmail').value.trim(),
-        password: $('regPassword').value,
-        phone: $('regPhone').value.trim(),
-        role: $('regRole').value
+        username: username,
+        email: email,
+        password: password,
+        phone: phone,
+        role: role
     };
     
     api('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }).then(({ status, data: resp }) => {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.style.display = 'inline';
+        if (btnLoading) btnLoading.style.display = 'none';
+        
         if (status === 200) {
             currentToken = resp.token;
             currentUser = resp.user;
             localStorage.setItem('token', resp.token);
             localStorage.setItem('user', JSON.stringify(resp.user));
+            localStorage.setItem('loginTime', Date.now().toString());
+            
             closeModal('registerModal');
+            clearRegisterForm();
             updateNavState();
             showToast('注册成功！欢迎加入', 'success');
             if (resp.user.role === 'provider') {
@@ -262,6 +450,30 @@ function handleRegister(e) {
         } else {
             errorEl.textContent = resp.error || '注册失败';
         }
+    }).catch(err => {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.style.display = 'inline';
+        if (btnLoading) btnLoading.style.display = 'none';
+        errorEl.textContent = '网络错误，请稍后重试';
+    });
+}
+
+function clearRegisterForm() {
+    $('regUsername').value = '';
+    $('regEmail').value = '';
+    $('regPassword').value = '';
+    $('regConfirmPassword').value = '';
+    $('regPhone').value = '';
+    $('regRole').value = 'user';
+    $('agreeTerms').checked = false;
+    $('usernameStatus').textContent = '';
+    $('emailStatus').textContent = '';
+    $('confirmPasswordStatus').textContent = '';
+    $('phoneStatus').textContent = '';
+    $('passwordStrength').querySelector('.strength-text').textContent = '请输入密码';
+    ['strength1', 'strength2', 'strength3', 'strength4'].forEach(id => {
+        const el = $(id);
+        if (el) el.className = 'strength-segment';
     });
 }
 
@@ -270,32 +482,85 @@ function handleLogin(e) {
     const errorEl = $('loginError');
     errorEl.textContent = '';
     
+    const username = $('loginUsername').value.trim();
+    const password = $('loginPassword').value;
+    
+    if (!username) {
+        errorEl.textContent = '请输入用户名或邮箱';
+        return;
+    }
+    if (!password) {
+        errorEl.textContent = '请输入密码';
+        return;
+    }
+    if (password.length < 6) {
+        errorEl.textContent = '密码至少6个字符';
+        return;
+    }
+    
+    const btn = $('loginBtn');
+    const btnText = $('loginBtnText');
+    const btnLoading = $('loginBtnLoading');
+    if (btn) btn.disabled = true;
+    if (btnText) btnText.style.display = 'none';
+    if (btnLoading) btnLoading.style.display = 'inline';
+    
     const data = {
-        username: $('loginUsername').value.trim(),
-        password: $('loginPassword').value
+        username: username,
+        password: password
     };
     
     api('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }).then(({ status, data: resp }) => {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.style.display = 'inline';
+        if (btnLoading) btnLoading.style.display = 'none';
+        
         if (status === 200) {
             currentToken = resp.token;
             currentUser = resp.user;
             if (resp.provider) currentProvider = resp.provider;
+            
             localStorage.setItem('token', resp.token);
             localStorage.setItem('user', JSON.stringify(resp.user));
+            localStorage.setItem('loginTime', Date.now().toString());
             if (resp.provider) localStorage.setItem('provider', JSON.stringify(resp.provider));
+            
+            const rememberMe = $('rememberMe');
+            if (rememberMe && rememberMe.checked) {
+                localStorage.setItem('rememberMe', 'true');
+            } else {
+                localStorage.removeItem('rememberMe');
+            }
+            
             closeModal('loginModal');
+            clearLoginForm();
             updateNavState();
             showToast('登录成功！', 'success');
             navigate(currentProvider ? 'providerDashboard' : 'dashboard');
         } else {
             errorEl.textContent = resp.error || '登录失败';
         }
+    }).catch(err => {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.style.display = 'inline';
+        if (btnLoading) btnLoading.style.display = 'none';
+        errorEl.textContent = '网络错误，请稍后重试';
     });
+}
+
+function clearLoginForm() {
+    $('loginUsername').value = '';
+    $('loginPassword').value = '';
+    $('rememberMe').checked = false;
 }
 
 function logout() {
     currentToken = null; currentUser = null; currentProvider = null;
-    localStorage.removeItem('token'); localStorage.removeItem('user'); localStorage.removeItem('provider');
+    localStorage.removeItem('token'); 
+    localStorage.removeItem('user'); 
+    localStorage.removeItem('provider');
+    localStorage.removeItem('loginTime');
+    localStorage.removeItem('rememberMe');
     updateNavState();
     showToast('已退出登录', 'info');
     navigate('home');
@@ -334,14 +599,41 @@ function initAuth() {
     const token = localStorage.getItem('token');
     const user = localStorage.getItem('user');
     const provider = localStorage.getItem('provider');
-    if (token && user) {
+    const loginTime = localStorage.getItem('loginTime');
+    const rememberMe = localStorage.getItem('rememberMe');
+    
+    if (!token || !user) {
+        return false;
+    }
+    
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+    if (loginTime) {
+        const timeDiff = Date.now() - parseInt(loginTime);
+        if (timeDiff > SEVEN_DAYS) {
+            logout();
+            return false;
+        }
+    }
+    
+    if (!rememberMe && loginTime) {
+        const SESSION_TIMEOUT = 24 * 60 * 60 * 1000;
+        const timeDiff = Date.now() - parseInt(loginTime);
+        if (timeDiff > SESSION_TIMEOUT) {
+            logout();
+            return false;
+        }
+    }
+    
+    try {
         currentToken = token;
         currentUser = JSON.parse(user);
         if (provider) currentProvider = JSON.parse(provider);
         updateNavState();
         return true;
+    } catch (e) {
+        logout();
+        return false;
     }
-    return false;
 }
 
 // ==================== Modal Management ====================

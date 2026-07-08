@@ -15,6 +15,42 @@ void AuthController::registerRoutes(httplib::Server& svr) {
         std::string email = body["email"];
         std::string role = body.contains("role") ? body["role"] : "user";
         
+        if (username.empty()) {
+            res.status = 400;
+            res.set_content(json{{"error", "用户名不能为空"}}.dump(), "application/json");
+            return;
+        }
+        
+        if (username.length() < 3 || username.length() > 50) {
+            res.status = 400;
+            res.set_content(json{{"error", "用户名长度必须在3-50个字符之间"}}.dump(), "application/json");
+            return;
+        }
+        
+        if (password.empty()) {
+            res.status = 400;
+            res.set_content(json{{"error", "密码不能为空"}}.dump(), "application/json");
+            return;
+        }
+        
+        if (password.length() < 6 || password.length() > 50) {
+            res.status = 400;
+            res.set_content(json{{"error", "密码长度必须在6-50个字符之间"}}.dump(), "application/json");
+            return;
+        }
+        
+        if (email.empty()) {
+            res.status = 400;
+            res.set_content(json{{"error", "邮箱不能为空"}}.dump(), "application/json");
+            return;
+        }
+        
+        if (email.find('@') == std::string::npos || email.find('.') == std::string::npos) {
+            res.status = 400;
+            res.set_content(json{{"error", "请输入有效的邮箱地址"}}.dump(), "application/json");
+            return;
+        }
+        
         auto& db = DatabaseService::getInstance();
         if (db.getUserByUsername(username).id != 0) {
             res.status = 400;
@@ -39,7 +75,7 @@ void AuthController::registerRoutes(httplib::Server& svr) {
             res.set_content(json{
                 {"message", "注册成功"},
                 {"token", token},
-                {"user", {{"id", userId}, {"username", username}, {"role", role}}}
+                {"user", {{"id", userId}, {"username", username}, {"email", email}, {"role", role}}}
             }.dump(), "application/json");
         } else {
             res.status = 500;
@@ -52,21 +88,58 @@ void AuthController::registerRoutes(httplib::Server& svr) {
         std::string username = body["username"];
         std::string password = body["password"];
         
-        auto& db = DatabaseService::getInstance();
-        auto user = db.getUserByUsername(username);
-        
-        if (user.id == 0 || user.password != Auth::sha256(password)) {
-            res.status = 401;
-            res.set_content(json{{"error", "用户名或密码错误"}}.dump(), "application/json");
+        if (username.empty()) {
+            res.status = 400;
+            res.set_content(json{{"error", "请输入用户名或邮箱"}}.dump(), "application/json");
             return;
         }
         
+        if (password.empty() || password.length() < 6) {
+            res.status = 400;
+            res.set_content(json{{"error", "密码长度至少6位"}}.dump(), "application/json");
+            return;
+        }
+        
+        auto& db = DatabaseService::getInstance();
+        auto user = db.getUserByUsername(username);
+        
+        if (user.id == 0) {
+            user = db.getUserByEmail(username);
+        }
+        
+        if (user.id == 0) {
+            res.status = 401;
+            res.set_content(json{{"error", "用户名或邮箱不存在"}}.dump(), "application/json");
+            return;
+        }
+        
+        if (user.password != Auth::sha256(password)) {
+            res.status = 401;
+            res.set_content(json{{"error", "密码错误"}}.dump(), "application/json");
+            return;
+        }
+        
+        auto provider = db.getProviderByUserId(user.id);
+        
         std::string token = Auth::createToken(user.id, user.username, user.role);
-        res.set_content(json{
+        
+        json response = {
             {"message", "登录成功"},
             {"token", token},
             {"user", {{"id", user.id}, {"username", user.username}, {"email", user.email}, {"role", user.role}}}
-        }.dump(), "application/json");
+        };
+        
+        if (provider.id > 0) {
+            response["provider"] = {
+                {"id", provider.id},
+                {"user_id", provider.user_id},
+                {"name", provider.name},
+                {"category", provider.category},
+                {"audit_status", provider.audit_status}
+            };
+        }
+        
+        res.set_content(response.dump(), "application/json");
     });
 
     svr.Get("/api/auth/me", [](const httplib::Request& req, httplib::Response& res) {

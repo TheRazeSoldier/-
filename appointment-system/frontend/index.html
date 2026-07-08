@@ -717,11 +717,29 @@
             <span class="modal-close" onclick="closeModal('loginModal')">&times;</span>
             <h2>登录</h2>
             <form id="loginForm" onsubmit="handleLogin(event)">
-                <div class="form-group"><label>用户名或邮箱</label><input type="text" id="loginUsername" required placeholder="请输入用户名或邮箱"></div>
-                <div class="form-group"><label>密码</label><input type="password" id="loginPassword" required placeholder="请输入密码"></div>
+                <div class="form-group">
+                    <label>用户名或邮箱</label>
+                    <input type="text" id="loginUsername" required placeholder="请输入用户名或邮箱" maxlength="50">
+                    <div class="form-hint">支持用户名或邮箱登录</div>
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="loginPassword" required placeholder="请输入密码" minlength="6" maxlength="50">
+                    <div class="form-hint">密码长度6-50位</div>
+                </div>
+                <div class="form-group form-row">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="rememberMe">
+                        <span>记住我（7天内自动登录）</span>
+                    </label>
+                    <a href="#" onclick="showToast('功能开发中', 'info')" class="form-link">忘记密码？</a>
+                </div>
                 <div class="form-error" id="loginError"></div>
-                <button type="submit" class="btn btn-primary btn-block">登录</button>
-                <p class="form-footer">还没有账号？<a href="#" onclick="switchModal('loginModal','registerModal')">立即注册</a></p>
+                <button type="submit" class="btn btn-primary btn-block" id="loginBtn">
+                    <span id="loginBtnText">登录</span>
+                    <span id="loginBtnLoading" style="display:none;">登录中...</span>
+                </button>
+                <p class="form-footer">还没有账号？<a href="javascript:void(0)" onclick="switchModal('loginModal','registerModal')">立即注册</a></p>
             </form>
         </div>
     </div>
@@ -731,14 +749,62 @@
             <span class="modal-close" onclick="closeModal('registerModal')">&times;</span>
             <h2>注册</h2>
             <form id="registerForm" onsubmit="handleRegister(event)">
-                <div class="form-group"><label>用户名</label><input type="text" id="regUsername" required placeholder="请输入用户名"></div>
-                <div class="form-group"><label>邮箱</label><input type="email" id="regEmail" required placeholder="请输入邮箱"></div>
-                <div class="form-group"><label>密码</label><input type="password" id="regPassword" required placeholder="请输入密码（至少6位）" minlength="6"></div>
-                <div class="form-group"><label>手机号</label><input type="tel" id="regPhone" placeholder="请输入手机号（选填）"></div>
-                <div class="form-group"><label>注册类型</label><select id="regRole"><option value="user">普通用户</option><option value="provider">服务商</option></select></div>
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="regUsername" required placeholder="请输入用户名" maxlength="50" oninput="validateUsername()">
+                    <div class="form-hint" id="usernameHint">用户名长度3-50位，支持中英文、数字、下划线</div>
+                    <div class="form-status" id="usernameStatus"></div>
+                </div>
+                <div class="form-group">
+                    <label>邮箱</label>
+                    <input type="email" id="regEmail" required placeholder="请输入邮箱" maxlength="100" oninput="validateEmail()">
+                    <div class="form-hint">请输入有效的邮箱地址</div>
+                    <div class="form-status" id="emailStatus"></div>
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="regPassword" required placeholder="请输入密码" minlength="6" maxlength="50" oninput="validatePassword()">
+                    <div class="form-hint">密码长度6-50位，建议包含字母和数字</div>
+                    <div class="password-strength" id="passwordStrength">
+                        <div class="strength-bar">
+                            <div class="strength-segment" id="strength1"></div>
+                            <div class="strength-segment" id="strength2"></div>
+                            <div class="strength-segment" id="strength3"></div>
+                            <div class="strength-segment" id="strength4"></div>
+                        </div>
+                        <div class="strength-text" id="strengthText">请输入密码</div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>确认密码</label>
+                    <input type="password" id="regConfirmPassword" required placeholder="请再次输入密码" maxlength="50" oninput="validateConfirmPassword()">
+                    <div class="form-status" id="confirmPasswordStatus"></div>
+                </div>
+                <div class="form-group">
+                    <label>手机号</label>
+                    <input type="tel" id="regPhone" placeholder="请输入手机号" maxlength="11" oninput="validatePhone()">
+                    <div class="form-hint" id="phoneHint">用于接收验证码和通知</div>
+                    <div class="form-status" id="phoneStatus"></div>
+                </div>
+                <div class="form-group">
+                    <label>注册类型</label>
+                    <select id="regRole" onchange="onRoleChange()">
+                        <option value="user">普通用户</option>
+                        <option value="provider">服务商</option>
+                    </select>
+                </div>
+                <div class="form-group form-row">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="agreeTerms" required>
+                        <span>我已阅读并同意<a href="#" onclick="showToast('服务条款', 'info')">《用户服务协议》</a>和<a href="#" onclick="showToast('隐私政策', 'info')">《隐私政策》</a></span>
+                    </label>
+                </div>
                 <div class="form-error" id="registerError"></div>
-                <button type="submit" class="btn btn-primary btn-block">注册</button>
-                <p class="form-footer">已有账号？<a href="#" onclick="switchModal('registerModal','loginModal')">立即登录</a></p>
+                <button type="submit" class="btn btn-primary btn-block" id="registerBtn">
+                    <span id="registerBtnText">注册</span>
+                    <span id="registerBtnLoading" style="display:none;">注册中...</span>
+                </button>
+                <p class="form-footer">已有账号？<a href="javascript:void(0)" onclick="switchModal('registerModal','loginModal')">立即登录</a></p>
             </form>
         </div>
     </div>

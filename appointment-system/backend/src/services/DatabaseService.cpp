@@ -50,7 +50,38 @@ bool DatabaseService::migrateDatabase() {
     
     sqlite3_exec(db_, "ALTER TABLE services ADD COLUMN IF NOT EXISTS image TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
     
+    createDefaultAdmin();
+    
     return true;
+}
+
+void DatabaseService::createDefaultAdmin() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    sqlite3_stmt* stmt;
+    const char* checkSql = "SELECT id FROM users WHERE username = 'admin';";
+    if (sqlite3_prepare_v2(db_, checkSql, -1, &stmt, nullptr) != SQLITE_OK) {
+        sqlite3_finalize(stmt);
+        return;
+    }
+    
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        return;
+    }
+    sqlite3_finalize(stmt);
+    
+    const char* insertSql = "INSERT INTO users (username, password, email, phone, role) VALUES ('admin', ?, 'admin@yueyuyue.com', '13800138000', 'admin');";
+    if (sqlite3_prepare_v2(db_, insertSql, -1, &stmt, nullptr) != SQLITE_OK) {
+        sqlite3_finalize(stmt);
+        return;
+    }
+    
+    std::string hashedPassword = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9";
+    sqlite3_bind_text(stmt, 1, hashedPassword.c_str(), -1, SQLITE_STATIC);
+    
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
 }
 
 bool DatabaseService::createTables() {
