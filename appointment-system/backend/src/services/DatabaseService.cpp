@@ -400,7 +400,7 @@ int DatabaseService::createProvider(const models::Provider& provider) {
 models::Provider DatabaseService::getProviderById(int id) {
     std::lock_guard<std::mutex> lock(mutex_);
     models::Provider p{};
-    const char* sql = "SELECT * FROM providers WHERE id = ?;";
+    const char* sql = "SELECT id, user_id, name, description, address, phone, category, avatar, status, audit_status, audit_comment, license_number, license_image, first_audit_user_id, first_audit_at, first_audit_comment, second_audit_user_id, second_audit_at, second_audit_comment, created_at FROM providers WHERE id = ?;";
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return p;
     
@@ -419,7 +419,13 @@ models::Provider DatabaseService::getProviderById(int id) {
         p.audit_comment = sqlite3_column_text(stmt, 10) ? (const char*)sqlite3_column_text(stmt, 10) : "";
         p.license_number = sqlite3_column_text(stmt, 11) ? (const char*)sqlite3_column_text(stmt, 11) : "";
         p.license_image = sqlite3_column_text(stmt, 12) ? (const char*)sqlite3_column_text(stmt, 12) : "";
-        p.created_at = sqlite3_column_text(stmt, 13) ? (const char*)sqlite3_column_text(stmt, 13) : "";
+        p.first_audit_user_id = sqlite3_column_int(stmt, 13);
+        p.first_audit_at = sqlite3_column_text(stmt, 14) ? (const char*)sqlite3_column_text(stmt, 14) : "";
+        p.first_audit_comment = sqlite3_column_text(stmt, 15) ? (const char*)sqlite3_column_text(stmt, 15) : "";
+        p.second_audit_user_id = sqlite3_column_int(stmt, 16);
+        p.second_audit_at = sqlite3_column_text(stmt, 17) ? (const char*)sqlite3_column_text(stmt, 17) : "";
+        p.second_audit_comment = sqlite3_column_text(stmt, 18) ? (const char*)sqlite3_column_text(stmt, 18) : "";
+        p.created_at = sqlite3_column_text(stmt, 19) ? (const char*)sqlite3_column_text(stmt, 19) : "";
     }
     sqlite3_finalize(stmt);
     return p;
@@ -456,7 +462,7 @@ models::Provider DatabaseService::getProviderByUserId(int userId) {
 std::vector<models::Provider> DatabaseService::getAllProviders() {
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<models::Provider> providers;
-    const char* sql = "SELECT * FROM providers WHERE status='active' AND audit_status='approved' ORDER BY created_at DESC;";
+    const char* sql = "SELECT id, user_id, name, description, address, phone, category, avatar, status, audit_status, audit_comment, license_number, license_image, first_audit_user_id, first_audit_at, first_audit_comment, second_audit_user_id, second_audit_at, second_audit_comment, created_at FROM providers ORDER BY created_at DESC;";
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return providers;
     
@@ -475,7 +481,13 @@ std::vector<models::Provider> DatabaseService::getAllProviders() {
         p.audit_comment = sqlite3_column_text(stmt, 10) ? (const char*)sqlite3_column_text(stmt, 10) : "";
         p.license_number = sqlite3_column_text(stmt, 11) ? (const char*)sqlite3_column_text(stmt, 11) : "";
         p.license_image = sqlite3_column_text(stmt, 12) ? (const char*)sqlite3_column_text(stmt, 12) : "";
-        p.created_at = sqlite3_column_text(stmt, 13) ? (const char*)sqlite3_column_text(stmt, 13) : "";
+        p.first_audit_user_id = sqlite3_column_int(stmt, 13);
+        p.first_audit_at = sqlite3_column_text(stmt, 14) ? (const char*)sqlite3_column_text(stmt, 14) : "";
+        p.first_audit_comment = sqlite3_column_text(stmt, 15) ? (const char*)sqlite3_column_text(stmt, 15) : "";
+        p.second_audit_user_id = sqlite3_column_int(stmt, 16);
+        p.second_audit_at = sqlite3_column_text(stmt, 17) ? (const char*)sqlite3_column_text(stmt, 17) : "";
+        p.second_audit_comment = sqlite3_column_text(stmt, 18) ? (const char*)sqlite3_column_text(stmt, 18) : "";
+        p.created_at = sqlite3_column_text(stmt, 19) ? (const char*)sqlite3_column_text(stmt, 19) : "";
         providers.push_back(p);
     }
     sqlite3_finalize(stmt);

@@ -2,12 +2,20 @@
 #include "../services/DatabaseService.h"
 #include "../middleware/AuthMiddleware.h"
 #include "../auth.h"
-#include <nlohmann/json.hpp>
+#include "../../include/json.hpp"
 
 using json = nlohmann::json;
 
 void AuditController::registerRoutes(httplib::Server& svr) {
-    svr.Get("/api/audit/providers", AuthMiddleware::adminOnly([](const httplib::Request& req, httplib::Response& res) {
+    svr.Get("/api/audit/providers", [](const httplib::Request& req, httplib::Response& res) {
+        AuthUser authUser{};
+        if (!AuthMiddleware::requireAuth(req, res, authUser)) return;
+        if (authUser.role != "admin") {
+            res.status = 403;
+            res.set_content(json{{"error", "无权限访问"}}.dump(), "application/json");
+            return;
+        }
+
         auto& db = DatabaseService::getInstance();
         auto providers = db.getAllProviders();
         
@@ -36,9 +44,17 @@ void AuditController::registerRoutes(httplib::Server& svr) {
         }
         
         res.set_content(result.dump(), "application/json");
-    }));
+    });
 
-    svr.Get("/api/audit/providers/pending", AuthMiddleware::adminOnly([](const httplib::Request& req, httplib::Response& res) {
+    svr.Get("/api/audit/providers/pending", [](const httplib::Request& req, httplib::Response& res) {
+        AuthUser authUser{};
+        if (!AuthMiddleware::requireAuth(req, res, authUser)) return;
+        if (authUser.role != "admin") {
+            res.status = 403;
+            res.set_content(json{{"error", "无权限访问"}}.dump(), "application/json");
+            return;
+        }
+
         auto& db = DatabaseService::getInstance();
         auto providers = db.getProvidersByAuditStatus("pending");
         
@@ -61,9 +77,17 @@ void AuditController::registerRoutes(httplib::Server& svr) {
         }
         
         res.set_content(result.dump(), "application/json");
-    }));
+    });
 
-    svr.Get("/api/audit/providers/first_pending", AuthMiddleware::adminOnly([](const httplib::Request& req, httplib::Response& res) {
+    svr.Get("/api/audit/providers/first_pending", [](const httplib::Request& req, httplib::Response& res) {
+        AuthUser authUser{};
+        if (!AuthMiddleware::requireAuth(req, res, authUser)) return;
+        if (authUser.role != "admin") {
+            res.status = 403;
+            res.set_content(json{{"error", "无权限访问"}}.dump(), "application/json");
+            return;
+        }
+
         auto& db = DatabaseService::getInstance();
         auto providers = db.getAllProviders();
         
@@ -88,9 +112,17 @@ void AuditController::registerRoutes(httplib::Server& svr) {
         }
         
         res.set_content(result.dump(), "application/json");
-    }));
+    });
 
-    svr.Get("/api/audit/providers/second_pending", AuthMiddleware::adminOnly([](const httplib::Request& req, httplib::Response& res) {
+    svr.Get("/api/audit/providers/second_pending", [](const httplib::Request& req, httplib::Response& res) {
+        AuthUser authUser{};
+        if (!AuthMiddleware::requireAuth(req, res, authUser)) return;
+        if (authUser.role != "admin") {
+            res.status = 403;
+            res.set_content(json{{"error", "无权限访问"}}.dump(), "application/json");
+            return;
+        }
+
         auto& db = DatabaseService::getInstance();
         auto providers = db.getAllProviders();
         
@@ -118,9 +150,17 @@ void AuditController::registerRoutes(httplib::Server& svr) {
         }
         
         res.set_content(result.dump(), "application/json");
-    }));
+    });
 
-    svr.Get("/api/audit/providers/:id/records", AuthMiddleware::adminOnly([](const httplib::Request& req, httplib::Response& res) {
+    svr.Get("/api/audit/providers/:id/records", [](const httplib::Request& req, httplib::Response& res) {
+        AuthUser authUser{};
+        if (!AuthMiddleware::requireAuth(req, res, authUser)) return;
+        if (authUser.role != "admin") {
+            res.status = 403;
+            res.set_content(json{{"error", "无权限访问"}}.dump(), "application/json");
+            return;
+        }
+
         int providerId = std::stoi(req.get_param_value("id"));
         auto& db = DatabaseService::getInstance();
         
@@ -141,9 +181,17 @@ void AuditController::registerRoutes(httplib::Server& svr) {
         }
         
         res.set_content(result.dump(), "application/json");
-    }));
+    });
 
-    svr.Post("/api/audit/providers/:id/first", AuthMiddleware::adminOnly([](const httplib::Request& req, httplib::Response& res) {
+    svr.Post("/api/audit/providers/:id/first", [](const httplib::Request& req, httplib::Response& res) {
+        AuthUser authUser{};
+        if (!AuthMiddleware::requireAuth(req, res, authUser)) return;
+        if (authUser.role != "admin") {
+            res.status = 403;
+            res.set_content(json{{"error", "无权限访问"}}.dump(), "application/json");
+            return;
+        }
+
         int providerId = std::stoi(req.get_param_value("id"));
         auto body = json::parse(req.body);
         
@@ -184,9 +232,17 @@ void AuditController::registerRoutes(httplib::Server& svr) {
             res.status = 500;
             res.set_content(json{{"error", "初审操作失败"}}.dump(), "application/json");
         }
-    }));
+    });
 
-    svr.Post("/api/audit/providers/:id/second", AuthMiddleware::adminOnly([](const httplib::Request& req, httplib::Response& res) {
+    svr.Post("/api/audit/providers/:id/second", [](const httplib::Request& req, httplib::Response& res) {
+        AuthUser authUser{};
+        if (!AuthMiddleware::requireAuth(req, res, authUser)) return;
+        if (authUser.role != "admin") {
+            res.status = 403;
+            res.set_content(json{{"error", "无权限访问"}}.dump(), "application/json");
+            return;
+        }
+
         int providerId = std::stoi(req.get_param_value("id"));
         auto body = json::parse(req.body);
         
@@ -233,5 +289,5 @@ void AuditController::registerRoutes(httplib::Server& svr) {
             res.status = 500;
             res.set_content(json{{"error", "复审操作失败"}}.dump(), "application/json");
         }
-    }));
+    });
 }
