@@ -159,9 +159,12 @@ function animateCounters() {
 
 // ==================== Navigation ====================
 function navigateToDefaultPage() {
-    // 登录后永远不回到公共首页
     if (currentUser) {
-        navigate(currentProvider ? 'providerDashboard' : 'dashboard');
+        if (currentUser.role === 'admin') {
+            navigate('dashboard');
+        } else {
+            navigate(currentProvider ? 'providerDashboard' : 'dashboard');
+        }
     } else {
         navigate('home');
     }
@@ -193,6 +196,7 @@ function navigate(page, data) {
         case 'coupons': loadUserCoupons(); break;
         case 'providerDashboard': loadProviderDashboard(); break;
         case 'reports': loadReports(); break;
+        case 'audit': loadAuditPage(); break;
     }
 }
 
@@ -223,6 +227,7 @@ function goBack() {
             case 'profile': loadProfile(); break;
             case 'coupons': loadUserCoupons(); break;
             case 'providerDashboard': loadProviderDashboard(); break;
+            case 'audit': loadAuditPage(); break;
         }
     } else {
         // 登录后兜底回到默认页面，不回到公共首页
@@ -536,7 +541,12 @@ function handleLogin(e) {
             clearLoginForm();
             updateNavState();
             showToast('登录成功！', 'success');
-            navigate(currentProvider ? 'providerDashboard' : 'dashboard');
+            
+            if (currentUser.role === 'admin') {
+                navigate('dashboard');
+            } else {
+                navigate(currentProvider ? 'providerDashboard' : 'dashboard');
+            }
         } else {
             errorEl.textContent = resp.error || '登录失败';
         }
@@ -573,18 +583,26 @@ function updateNavState() {
     const userAvatar = $('userAvatar');
     const providerLink = $('providerLink');
     const providerFeatureCard = $('providerFeatureCard');
+    const auditFeatureCard = $('auditFeatureCard');
     
     if (currentUser) {
         navActions.style.display = 'none';
         navUser.style.display = 'flex';
         userNameDisplay.textContent = currentUser.username;
         userAvatar.textContent = currentUser.username.charAt(0).toUpperCase();
+        
         if (currentUser.role === 'provider') {
             providerLink.style.display = 'block';
             if (providerFeatureCard) providerFeatureCard.style.display = 'flex';
+            if (auditFeatureCard) auditFeatureCard.style.display = 'none';
+        } else if (currentUser.role === 'admin') {
+            providerLink.style.display = 'none';
+            if (providerFeatureCard) providerFeatureCard.style.display = 'none';
+            if (auditFeatureCard) auditFeatureCard.style.display = 'flex';
         } else {
             providerLink.style.display = 'none';
             if (providerFeatureCard) providerFeatureCard.style.display = 'none';
+            if (auditFeatureCard) auditFeatureCard.style.display = 'none';
         }
         loadUnreadCount();
     } else {
@@ -592,6 +610,7 @@ function updateNavState() {
         navUser.style.display = 'none';
         providerLink.style.display = 'none';
         if (providerFeatureCard) providerFeatureCard.style.display = 'none';
+        if (auditFeatureCard) auditFeatureCard.style.display = 'none';
     }
 }
 
