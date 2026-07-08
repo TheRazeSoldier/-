@@ -27,6 +27,10 @@ struct Provider {
     std::string category;
     std::string avatar;
     std::string status;
+    std::string audit_status;
+    std::string audit_comment;
+    std::string license_number;
+    std::string license_image;
     std::string created_at;
 };
 
@@ -83,6 +87,33 @@ struct Stats {
     int total_services;
     int total_appointments;
     double total_revenue;
+};
+
+struct Coupon {
+    int id;
+    int provider_id;
+    std::string name;
+    std::string description;
+    double discount_amount;
+    double min_amount;
+    int discount_percent;
+    std::string coupon_type;
+    int total_count;
+    int used_count;
+    std::string start_time;
+    std::string end_time;
+    std::string status;
+    std::string created_at;
+};
+
+struct UserCoupon {
+    int id;
+    int user_id;
+    int coupon_id;
+    int provider_id;
+    std::string status;
+    std::string used_at;
+    std::string created_at;
 };
 
 } // namespace models

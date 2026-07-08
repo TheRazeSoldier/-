@@ -32,6 +32,53 @@ void ServiceController::registerRoutes(httplib::Server& svr) {
         res.set_content(result.dump(), "application/json");
     });
 
+    svr.Get("/api/services/search", [](const httplib::Request& req, httplib::Response& res) {
+        auto& db = DatabaseService::getInstance();
+        
+        auto keyword = req.get_param_value("keyword");
+        auto category = req.get_param_value("category");
+        double minPrice = req.has_param("min_price") ? std::stod(req.get_param_value("min_price")) : 0;
+        double maxPrice = req.has_param("max_price") ? std::stod(req.get_param_value("max_price")) : 0;
+        int minDuration = req.has_param("min_duration") ? std::stoi(req.get_param_value("min_duration")) : 0;
+        int maxDuration = req.has_param("max_duration") ? std::stoi(req.get_param_value("max_duration")) : 0;
+        auto sortBy = req.get_param_value("sort_by");
+        auto sortOrder = req.get_param_value("sort_order");
+        
+        if (sortBy.empty()) sortBy = "created_at";
+        if (sortOrder.empty()) sortOrder = "desc";
+        
+        auto services = db.advancedSearchServices(keyword, category, minPrice, maxPrice, minDuration, maxDuration, sortBy, sortOrder);
+        
+        json result = json::array();
+        for (const auto& s : services) {
+            auto provider = db.getProviderById(s.provider_id);
+            result.push_back({
+                {"id", s.id},
+                {"provider_id", s.provider_id},
+                {"provider_name", provider.name},
+                {"name", s.name},
+                {"description", s.description},
+                {"category", s.category},
+                {"price", s.price},
+                {"duration", s.duration},
+                {"image", s.image},
+                {"rating", db.getAverageRating(s.id)}
+            });
+        }
+        res.set_content(result.dump(), "application/json");
+    });
+
+    svr.Get("/api/services/categories", [](const httplib::Request& req, httplib::Response& res) {
+        auto& db = DatabaseService::getInstance();
+        auto categories = db.getAllCategories();
+        
+        json result = json::array();
+        for (const auto& cat : categories) {
+            result.push_back(cat);
+        }
+        res.set_content(result.dump(), "application/json");
+    });
+
     svr.Get("/api/services/:id", [](const httplib::Request& req, httplib::Response& res) {
         int id = std::stoi(req.get_param_value("id"));
         auto& db = DatabaseService::getInstance();
@@ -83,6 +130,12 @@ void ServiceController::registerRoutes(httplib::Server& svr) {
         if (provider.id == 0) {
             res.status = 400;
             res.set_content(json{{"error", "请先创建服务商信息"}}.dump(), "application/json");
+            return;
+        }
+        
+        if (provider.audit_status != "approved") {
+            res.status = 400;
+            res.set_content(json{{"error", "服务商资质审核未通过，无法发布服务"}}.dump(), "application/json");
             return;
         }
         

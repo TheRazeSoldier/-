@@ -63,6 +63,10 @@ bool DatabaseService::createTables() {
             category TEXT DEFAULT '',
             avatar TEXT DEFAULT '',
             status TEXT DEFAULT 'active',
+            audit_status TEXT DEFAULT 'pending',
+            audit_comment TEXT DEFAULT '',
+            license_number TEXT DEFAULT '',
+            license_image TEXT DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -112,6 +116,33 @@ bool DatabaseService::createTables() {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE TABLE IF NOT EXISTS coupons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider_id INTEGER REFERENCES providers(id),
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            discount_amount REAL DEFAULT 0,
+            min_amount REAL DEFAULT 0,
+            discount_percent INTEGER DEFAULT 0,
+            coupon_type TEXT DEFAULT 'fixed',
+            total_count INTEGER DEFAULT 100,
+            used_count INTEGER DEFAULT 0,
+            start_time DATETIME NOT NULL,
+            end_time DATETIME NOT NULL,
+            status TEXT DEFAULT 'active',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS user_coupons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id),
+            coupon_id INTEGER REFERENCES coupons(id),
+            provider_id INTEGER REFERENCES providers(id),
+            status TEXT DEFAULT 'unused',
+            used_at DATETIME DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
         CREATE INDEX IF NOT EXISTS idx_appointments_user ON appointments(user_id);
         CREATE INDEX IF NOT EXISTS idx_appointments_provider ON appointments(provider_id);
         CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
@@ -119,6 +150,9 @@ bool DatabaseService::createTables() {
         CREATE INDEX IF NOT EXISTS idx_services_category ON services(category);
         CREATE INDEX IF NOT EXISTS idx_reviews_service ON reviews(service_id);
         CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+        CREATE INDEX IF NOT EXISTS idx_coupons_provider ON coupons(provider_id);
+        CREATE INDEX IF NOT EXISTS idx_user_coupons_user ON user_coupons(user_id);
+        CREATE INDEX IF NOT EXISTS idx_user_coupons_provider ON user_coupons(provider_id);
     )";
     return executeSQL(sql);
 }
@@ -252,7 +286,7 @@ std::vector<models::User> DatabaseService::getAllUsers() {
 
 int DatabaseService::createProvider(const models::Provider& provider) {
     std::lock_guard<std::mutex> lock(mutex_);
-    const char* sql = "INSERT INTO providers (user_id, name, description, address, phone, category, avatar, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
+    const char* sql = "INSERT INTO providers (user_id, name, description, address, phone, category, avatar, status, audit_status, license_number, license_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return -1;
     
@@ -265,6 +299,10 @@ int DatabaseService::createProvider(const models::Provider& provider) {
     sqlite3_bind_text(stmt, 7, provider.avatar.c_str(), -1, SQLITE_TRANSIENT);
     std::string status = provider.status.empty() ? "active" : provider.status;
     sqlite3_bind_text(stmt, 8, status.c_str(), -1, SQLITE_TRANSIENT);
+    std::string auditStatus = provider.audit_status.empty() ? "pending" : provider.audit_status;
+    sqlite3_bind_text(stmt, 9, auditStatus.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 10, provider.license_number.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 11, provider.license_image.c_str(), -1, SQLITE_TRANSIENT);
     
     int result = -1;
     if (sqlite3_step(stmt) == SQLITE_DONE) {
@@ -292,7 +330,11 @@ models::Provider DatabaseService::getProviderById(int id) {
         p.category = sqlite3_column_text(stmt, 6) ? (const char*)sqlite3_column_text(stmt, 6) : "";
         p.avatar = sqlite3_column_text(stmt, 7) ? (const char*)sqlite3_column_text(stmt, 7) : "";
         p.status = sqlite3_column_text(stmt, 8) ? (const char*)sqlite3_column_text(stmt, 8) : "";
-        p.created_at = sqlite3_column_text(stmt, 9) ? (const char*)sqlite3_column_text(stmt, 9) : "";
+        p.audit_status = sqlite3_column_text(stmt, 9) ? (const char*)sqlite3_column_text(stmt, 9) : "pending";
+        p.audit_comment = sqlite3_column_text(stmt, 10) ? (const char*)sqlite3_column_text(stmt, 10) : "";
+        p.license_number = sqlite3_column_text(stmt, 11) ? (const char*)sqlite3_column_text(stmt, 11) : "";
+        p.license_image = sqlite3_column_text(stmt, 12) ? (const char*)sqlite3_column_text(stmt, 12) : "";
+        p.created_at = sqlite3_column_text(stmt, 13) ? (const char*)sqlite3_column_text(stmt, 13) : "";
     }
     sqlite3_finalize(stmt);
     return p;
@@ -316,7 +358,11 @@ models::Provider DatabaseService::getProviderByUserId(int userId) {
         p.category = sqlite3_column_text(stmt, 6) ? (const char*)sqlite3_column_text(stmt, 6) : "";
         p.avatar = sqlite3_column_text(stmt, 7) ? (const char*)sqlite3_column_text(stmt, 7) : "";
         p.status = sqlite3_column_text(stmt, 8) ? (const char*)sqlite3_column_text(stmt, 8) : "";
-        p.created_at = sqlite3_column_text(stmt, 9) ? (const char*)sqlite3_column_text(stmt, 9) : "";
+        p.audit_status = sqlite3_column_text(stmt, 9) ? (const char*)sqlite3_column_text(stmt, 9) : "pending";
+        p.audit_comment = sqlite3_column_text(stmt, 10) ? (const char*)sqlite3_column_text(stmt, 10) : "";
+        p.license_number = sqlite3_column_text(stmt, 11) ? (const char*)sqlite3_column_text(stmt, 11) : "";
+        p.license_image = sqlite3_column_text(stmt, 12) ? (const char*)sqlite3_column_text(stmt, 12) : "";
+        p.created_at = sqlite3_column_text(stmt, 13) ? (const char*)sqlite3_column_text(stmt, 13) : "";
     }
     sqlite3_finalize(stmt);
     return p;
@@ -325,7 +371,7 @@ models::Provider DatabaseService::getProviderByUserId(int userId) {
 std::vector<models::Provider> DatabaseService::getAllProviders() {
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<models::Provider> providers;
-    const char* sql = "SELECT * FROM providers WHERE status='active' ORDER BY created_at DESC;";
+    const char* sql = "SELECT * FROM providers WHERE status='active' AND audit_status='approved' ORDER BY created_at DESC;";
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return providers;
     
@@ -340,7 +386,11 @@ std::vector<models::Provider> DatabaseService::getAllProviders() {
         p.category = sqlite3_column_text(stmt, 6) ? (const char*)sqlite3_column_text(stmt, 6) : "";
         p.avatar = sqlite3_column_text(stmt, 7) ? (const char*)sqlite3_column_text(stmt, 7) : "";
         p.status = sqlite3_column_text(stmt, 8) ? (const char*)sqlite3_column_text(stmt, 8) : "";
-        p.created_at = sqlite3_column_text(stmt, 9) ? (const char*)sqlite3_column_text(stmt, 9) : "";
+        p.audit_status = sqlite3_column_text(stmt, 9) ? (const char*)sqlite3_column_text(stmt, 9) : "pending";
+        p.audit_comment = sqlite3_column_text(stmt, 10) ? (const char*)sqlite3_column_text(stmt, 10) : "";
+        p.license_number = sqlite3_column_text(stmt, 11) ? (const char*)sqlite3_column_text(stmt, 11) : "";
+        p.license_image = sqlite3_column_text(stmt, 12) ? (const char*)sqlite3_column_text(stmt, 12) : "";
+        p.created_at = sqlite3_column_text(stmt, 13) ? (const char*)sqlite3_column_text(stmt, 13) : "";
         providers.push_back(p);
     }
     sqlite3_finalize(stmt);
@@ -350,7 +400,7 @@ std::vector<models::Provider> DatabaseService::getAllProviders() {
 std::vector<models::Provider> DatabaseService::getProvidersByCategory(const std::string& category) {
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<models::Provider> providers;
-    const char* sql = "SELECT * FROM providers WHERE category = ? AND status='active' ORDER BY created_at DESC;";
+    const char* sql = "SELECT * FROM providers WHERE category = ? AND status='active' AND audit_status='approved' ORDER BY created_at DESC;";
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return providers;
     
@@ -366,7 +416,11 @@ std::vector<models::Provider> DatabaseService::getProvidersByCategory(const std:
         p.category = sqlite3_column_text(stmt, 6) ? (const char*)sqlite3_column_text(stmt, 6) : "";
         p.avatar = sqlite3_column_text(stmt, 7) ? (const char*)sqlite3_column_text(stmt, 7) : "";
         p.status = sqlite3_column_text(stmt, 8) ? (const char*)sqlite3_column_text(stmt, 8) : "";
-        p.created_at = sqlite3_column_text(stmt, 9) ? (const char*)sqlite3_column_text(stmt, 9) : "";
+        p.audit_status = sqlite3_column_text(stmt, 9) ? (const char*)sqlite3_column_text(stmt, 9) : "pending";
+        p.audit_comment = sqlite3_column_text(stmt, 10) ? (const char*)sqlite3_column_text(stmt, 10) : "";
+        p.license_number = sqlite3_column_text(stmt, 11) ? (const char*)sqlite3_column_text(stmt, 11) : "";
+        p.license_image = sqlite3_column_text(stmt, 12) ? (const char*)sqlite3_column_text(stmt, 12) : "";
+        p.created_at = sqlite3_column_text(stmt, 13) ? (const char*)sqlite3_column_text(stmt, 13) : "";
         providers.push_back(p);
     }
     sqlite3_finalize(stmt);
@@ -375,7 +429,7 @@ std::vector<models::Provider> DatabaseService::getProvidersByCategory(const std:
 
 bool DatabaseService::updateProvider(int id, const models::Provider& provider) {
     std::lock_guard<std::mutex> lock(mutex_);
-    const char* sql = "UPDATE providers SET name=?, description=?, address=?, phone=?, category=?, avatar=? WHERE id=?;";
+    const char* sql = "UPDATE providers SET name=?, description=?, address=?, phone=?, category=?, avatar=?, license_number=?, license_image=? WHERE id=?;";
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
     
@@ -385,7 +439,9 @@ bool DatabaseService::updateProvider(int id, const models::Provider& provider) {
     sqlite3_bind_text(stmt, 4, provider.phone.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 5, provider.category.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 6, provider.avatar.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int(stmt, 7, id);
+    sqlite3_bind_text(stmt, 7, provider.license_number.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 8, provider.license_image.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 9, id);
     
     bool ok = sqlite3_step(stmt) == SQLITE_DONE;
     sqlite3_finalize(stmt);
@@ -915,4 +971,403 @@ models::Stats DatabaseService::getStats() {
     }
     
     return stats;
+}
+
+bool DatabaseService::auditProvider(int id, const std::string& auditStatus, const std::string& auditComment) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const char* sql = "UPDATE providers SET audit_status=?, audit_comment=? WHERE id=?;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    
+    sqlite3_bind_text(stmt, 1, auditStatus.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, auditComment.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 3, id);
+    
+    bool ok = sqlite3_step(stmt) == SQLITE_DONE;
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
+std::vector<models::Provider> DatabaseService::getProvidersByAuditStatus(const std::string& auditStatus) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::Provider> providers;
+    const char* sql = "SELECT * FROM providers WHERE audit_status = ? ORDER BY created_at DESC;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return providers;
+    
+    sqlite3_bind_text(stmt, 1, auditStatus.c_str(), -1, SQLITE_TRANSIENT);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        models::Provider p;
+        p.id = sqlite3_column_int(stmt, 0);
+        p.user_id = sqlite3_column_int(stmt, 1);
+        p.name = (const char*)sqlite3_column_text(stmt, 2);
+        p.description = sqlite3_column_text(stmt, 3) ? (const char*)sqlite3_column_text(stmt, 3) : "";
+        p.address = sqlite3_column_text(stmt, 4) ? (const char*)sqlite3_column_text(stmt, 4) : "";
+        p.phone = sqlite3_column_text(stmt, 5) ? (const char*)sqlite3_column_text(stmt, 5) : "";
+        p.category = sqlite3_column_text(stmt, 6) ? (const char*)sqlite3_column_text(stmt, 6) : "";
+        p.avatar = sqlite3_column_text(stmt, 7) ? (const char*)sqlite3_column_text(stmt, 7) : "";
+        p.status = sqlite3_column_text(stmt, 8) ? (const char*)sqlite3_column_text(stmt, 8) : "";
+        p.audit_status = sqlite3_column_text(stmt, 9) ? (const char*)sqlite3_column_text(stmt, 9) : "pending";
+        p.audit_comment = sqlite3_column_text(stmt, 10) ? (const char*)sqlite3_column_text(stmt, 10) : "";
+        p.license_number = sqlite3_column_text(stmt, 11) ? (const char*)sqlite3_column_text(stmt, 11) : "";
+        p.license_image = sqlite3_column_text(stmt, 12) ? (const char*)sqlite3_column_text(stmt, 12) : "";
+        p.created_at = sqlite3_column_text(stmt, 13) ? (const char*)sqlite3_column_text(stmt, 13) : "";
+        providers.push_back(p);
+    }
+    sqlite3_finalize(stmt);
+    return providers;
+}
+
+std::vector<models::Service> DatabaseService::advancedSearchServices(
+    const std::string& keyword, 
+    const std::string& category, 
+    double minPrice, 
+    double maxPrice, 
+    int minDuration, 
+    int maxDuration,
+    const std::string& sortBy,
+    const std::string& sortOrder) {
+    
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::Service> services;
+    std::string sql = "SELECT s.* FROM services s ";
+    sql += "LEFT JOIN providers p ON s.provider_id = p.id ";
+    sql += "WHERE s.status='active'";
+    
+    if (!keyword.empty()) sql += " AND (s.name LIKE ? OR s.description LIKE ?)";
+    if (!category.empty()) sql += " AND s.category = ?";
+    if (minPrice > 0) sql += " AND s.price >= ?";
+    if (maxPrice > 0) sql += " AND s.price <= ?";
+    if (minDuration > 0) sql += " AND s.duration >= ?";
+    if (maxDuration > 0) sql += " AND s.duration <= ?";
+    
+    std::string orderField = "s.created_at";
+    if (sortBy == "price") orderField = "s.price";
+    else if (sortBy == "rating") orderField = "(SELECT AVG(r.rating) FROM reviews r WHERE r.service_id = s.id)";
+    else if (sortBy == "duration") orderField = "s.duration";
+    
+    sql += " ORDER BY " + orderField + " " + (sortOrder == "asc" ? "ASC" : "DESC") + ";";
+    
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return services;
+    
+    int idx = 1;
+    std::string likeKeyword = "%" + keyword + "%";
+    if (!keyword.empty()) {
+        sqlite3_bind_text(stmt, idx++, likeKeyword.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, idx++, likeKeyword.c_str(), -1, SQLITE_TRANSIENT);
+    }
+    if (!category.empty()) {
+        sqlite3_bind_text(stmt, idx++, category.c_str(), -1, SQLITE_TRANSIENT);
+    }
+    if (minPrice > 0) sqlite3_bind_double(stmt, idx++, minPrice);
+    if (maxPrice > 0) sqlite3_bind_double(stmt, idx++, maxPrice);
+    if (minDuration > 0) sqlite3_bind_int(stmt, idx++, minDuration);
+    if (maxDuration > 0) sqlite3_bind_int(stmt, idx++, maxDuration);
+    
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        models::Service s;
+        s.id = sqlite3_column_int(stmt, 0);
+        s.provider_id = sqlite3_column_int(stmt, 1);
+        s.name = (const char*)sqlite3_column_text(stmt, 2);
+        s.description = sqlite3_column_text(stmt, 3) ? (const char*)sqlite3_column_text(stmt, 3) : "";
+        s.category = sqlite3_column_text(stmt, 4) ? (const char*)sqlite3_column_text(stmt, 4) : "";
+        s.price = sqlite3_column_double(stmt, 5);
+        s.duration = sqlite3_column_int(stmt, 6);
+        s.image = sqlite3_column_text(stmt, 7) ? (const char*)sqlite3_column_text(stmt, 7) : "";
+        s.status = sqlite3_column_text(stmt, 8) ? (const char*)sqlite3_column_text(stmt, 8) : "";
+        s.created_at = sqlite3_column_text(stmt, 9) ? (const char*)sqlite3_column_text(stmt, 9) : "";
+        services.push_back(s);
+    }
+    sqlite3_finalize(stmt);
+    return services;
+}
+
+std::vector<models::Service> DatabaseService::getRecommendedServices(int userId, int limit) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::Service> services;
+    
+    const char* sql = R"(
+        SELECT s.* FROM services s
+        LEFT JOIN providers p ON s.provider_id = p.id
+        LEFT JOIN (
+            SELECT service_id, COUNT(*) as cnt 
+            FROM appointments a 
+            WHERE a.status = 'completed' 
+            GROUP BY service_id
+        ) pop ON s.id = pop.service_id
+        WHERE s.status='active'
+        ORDER BY COALESCE(pop.cnt, 0) DESC, (SELECT AVG(r.rating) FROM reviews r WHERE r.service_id = s.id) DESC
+        LIMIT ?;
+    )";
+    
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return services;
+    
+    sqlite3_bind_int(stmt, 1, limit);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        models::Service s;
+        s.id = sqlite3_column_int(stmt, 0);
+        s.provider_id = sqlite3_column_int(stmt, 1);
+        s.name = (const char*)sqlite3_column_text(stmt, 2);
+        s.description = sqlite3_column_text(stmt, 3) ? (const char*)sqlite3_column_text(stmt, 3) : "";
+        s.category = sqlite3_column_text(stmt, 4) ? (const char*)sqlite3_column_text(stmt, 4) : "";
+        s.price = sqlite3_column_double(stmt, 5);
+        s.duration = sqlite3_column_int(stmt, 6);
+        s.image = sqlite3_column_text(stmt, 7) ? (const char*)sqlite3_column_text(stmt, 7) : "";
+        s.status = sqlite3_column_text(stmt, 8) ? (const char*)sqlite3_column_text(stmt, 8) : "";
+        s.created_at = sqlite3_column_text(stmt, 9) ? (const char*)sqlite3_column_text(stmt, 9) : "";
+        services.push_back(s);
+    }
+    sqlite3_finalize(stmt);
+    return services;
+}
+
+std::vector<std::string> DatabaseService::getAllCategories() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<std::string> categories;
+    const char* sql = "SELECT DISTINCT category FROM services WHERE category != '' ORDER BY category;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return categories;
+    
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        categories.push_back((const char*)sqlite3_column_text(stmt, 0));
+    }
+    sqlite3_finalize(stmt);
+    return categories;
+}
+
+int DatabaseService::createCoupon(const models::Coupon& coupon) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const char* sql = "INSERT INTO coupons (provider_id, name, description, discount_amount, min_amount, discount_percent, coupon_type, total_count, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return -1;
+    
+    sqlite3_bind_int(stmt, 1, coupon.provider_id);
+    sqlite3_bind_text(stmt, 2, coupon.name.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, coupon.description.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_double(stmt, 4, coupon.discount_amount);
+    sqlite3_bind_double(stmt, 5, coupon.min_amount);
+    sqlite3_bind_int(stmt, 6, coupon.discount_percent);
+    sqlite3_bind_text(stmt, 7, coupon.coupon_type.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 8, coupon.total_count);
+    sqlite3_bind_text(stmt, 9, coupon.start_time.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 10, coupon.end_time.c_str(), -1, SQLITE_TRANSIENT);
+    
+    int result = -1;
+    if (sqlite3_step(stmt) == SQLITE_DONE) {
+        result = (int)sqlite3_last_insert_rowid(db_);
+    }
+    sqlite3_finalize(stmt);
+    return result;
+}
+
+models::Coupon DatabaseService::getCouponById(int id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    models::Coupon c{};
+    const char* sql = "SELECT * FROM coupons WHERE id = ?;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return c;
+    
+    sqlite3_bind_int(stmt, 1, id);
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        c.id = sqlite3_column_int(stmt, 0);
+        c.provider_id = sqlite3_column_int(stmt, 1);
+        c.name = (const char*)sqlite3_column_text(stmt, 2);
+        c.description = sqlite3_column_text(stmt, 3) ? (const char*)sqlite3_column_text(stmt, 3) : "";
+        c.discount_amount = sqlite3_column_double(stmt, 4);
+        c.min_amount = sqlite3_column_double(stmt, 5);
+        c.discount_percent = sqlite3_column_int(stmt, 6);
+        c.coupon_type = sqlite3_column_text(stmt, 7) ? (const char*)sqlite3_column_text(stmt, 7) : "fixed";
+        c.total_count = sqlite3_column_int(stmt, 8);
+        c.used_count = sqlite3_column_int(stmt, 9);
+        c.start_time = sqlite3_column_text(stmt, 10) ? (const char*)sqlite3_column_text(stmt, 10) : "";
+        c.end_time = sqlite3_column_text(stmt, 11) ? (const char*)sqlite3_column_text(stmt, 11) : "";
+        c.status = sqlite3_column_text(stmt, 12) ? (const char*)sqlite3_column_text(stmt, 12) : "";
+        c.created_at = sqlite3_column_text(stmt, 13) ? (const char*)sqlite3_column_text(stmt, 13) : "";
+    }
+    sqlite3_finalize(stmt);
+    return c;
+}
+
+std::vector<models::Coupon> DatabaseService::getCouponsByProvider(int providerId) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::Coupon> coupons;
+    const char* sql = "SELECT * FROM coupons WHERE provider_id = ? ORDER BY created_at DESC;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return coupons;
+    
+    sqlite3_bind_int(stmt, 1, providerId);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        models::Coupon c;
+        c.id = sqlite3_column_int(stmt, 0);
+        c.provider_id = sqlite3_column_int(stmt, 1);
+        c.name = (const char*)sqlite3_column_text(stmt, 2);
+        c.description = sqlite3_column_text(stmt, 3) ? (const char*)sqlite3_column_text(stmt, 3) : "";
+        c.discount_amount = sqlite3_column_double(stmt, 4);
+        c.min_amount = sqlite3_column_double(stmt, 5);
+        c.discount_percent = sqlite3_column_int(stmt, 6);
+        c.coupon_type = sqlite3_column_text(stmt, 7) ? (const char*)sqlite3_column_text(stmt, 7) : "fixed";
+        c.total_count = sqlite3_column_int(stmt, 8);
+        c.used_count = sqlite3_column_int(stmt, 9);
+        c.start_time = sqlite3_column_text(stmt, 10) ? (const char*)sqlite3_column_text(stmt, 10) : "";
+        c.end_time = sqlite3_column_text(stmt, 11) ? (const char*)sqlite3_column_text(stmt, 11) : "";
+        c.status = sqlite3_column_text(stmt, 12) ? (const char*)sqlite3_column_text(stmt, 12) : "";
+        c.created_at = sqlite3_column_text(stmt, 13) ? (const char*)sqlite3_column_text(stmt, 13) : "";
+        coupons.push_back(c);
+    }
+    sqlite3_finalize(stmt);
+    return coupons;
+}
+
+std::vector<models::Coupon> DatabaseService::getAvailableCoupons(int providerId) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::Coupon> coupons;
+    const char* sql = R"(
+        SELECT * FROM coupons 
+        WHERE provider_id = ? 
+        AND status = 'active' 
+        AND used_count < total_count
+        AND start_time <= CURRENT_TIMESTAMP
+        AND end_time >= CURRENT_TIMESTAMP
+        ORDER BY created_at DESC;
+    )";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return coupons;
+    
+    sqlite3_bind_int(stmt, 1, providerId);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        models::Coupon c;
+        c.id = sqlite3_column_int(stmt, 0);
+        c.provider_id = sqlite3_column_int(stmt, 1);
+        c.name = (const char*)sqlite3_column_text(stmt, 2);
+        c.description = sqlite3_column_text(stmt, 3) ? (const char*)sqlite3_column_text(stmt, 3) : "";
+        c.discount_amount = sqlite3_column_double(stmt, 4);
+        c.min_amount = sqlite3_column_double(stmt, 5);
+        c.discount_percent = sqlite3_column_int(stmt, 6);
+        c.coupon_type = sqlite3_column_text(stmt, 7) ? (const char*)sqlite3_column_text(stmt, 7) : "fixed";
+        c.total_count = sqlite3_column_int(stmt, 8);
+        c.used_count = sqlite3_column_int(stmt, 9);
+        c.start_time = sqlite3_column_text(stmt, 10) ? (const char*)sqlite3_column_text(stmt, 10) : "";
+        c.end_time = sqlite3_column_text(stmt, 11) ? (const char*)sqlite3_column_text(stmt, 11) : "";
+        c.status = sqlite3_column_text(stmt, 12) ? (const char*)sqlite3_column_text(stmt, 12) : "";
+        c.created_at = sqlite3_column_text(stmt, 13) ? (const char*)sqlite3_column_text(stmt, 13) : "";
+        coupons.push_back(c);
+    }
+    sqlite3_finalize(stmt);
+    return coupons;
+}
+
+int DatabaseService::claimCoupon(int userId, int couponId) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    auto coupon = getCouponById(couponId);
+    if (coupon.id == 0 || coupon.status != "active" || coupon.used_count >= coupon.total_count) {
+        return -1;
+    }
+    
+    const char* sqlCheck = "SELECT COUNT(*) FROM user_coupons WHERE user_id = ? AND coupon_id = ? AND status = 'unused';";
+    sqlite3_stmt* stmtCheck;
+    if (sqlite3_prepare_v2(db_, sqlCheck, -1, &stmtCheck, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmtCheck, 1, userId);
+        sqlite3_bind_int(stmtCheck, 2, couponId);
+        if (sqlite3_step(stmtCheck) == SQLITE_ROW && sqlite3_column_int(stmtCheck, 0) > 0) {
+            sqlite3_finalize(stmtCheck);
+            return -2;
+        }
+        sqlite3_finalize(stmtCheck);
+    }
+    
+    const char* sql = "INSERT INTO user_coupons (user_id, coupon_id, provider_id) VALUES (?, ?, ?);";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return -1;
+    
+    sqlite3_bind_int(stmt, 1, userId);
+    sqlite3_bind_int(stmt, 2, couponId);
+    sqlite3_bind_int(stmt, 3, coupon.provider_id);
+    
+    int result = -1;
+    if (sqlite3_step(stmt) == SQLITE_DONE) {
+        result = (int)sqlite3_last_insert_rowid(db_);
+        const char* sqlUpdate = "UPDATE coupons SET used_count = used_count + 1 WHERE id = ?;";
+        sqlite3_stmt* stmtUpdate;
+        if (sqlite3_prepare_v2(db_, sqlUpdate, -1, &stmtUpdate, nullptr) == SQLITE_OK) {
+            sqlite3_bind_int(stmtUpdate, 1, couponId);
+            sqlite3_step(stmtUpdate);
+            sqlite3_finalize(stmtUpdate);
+        }
+    }
+    sqlite3_finalize(stmt);
+    return result;
+}
+
+std::vector<models::UserCoupon> DatabaseService::getUserCoupons(int userId) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::UserCoupon> userCoupons;
+    const char* sql = R"(
+        SELECT uc.*, c.name, c.description, c.discount_amount, c.min_amount, c.discount_percent, c.coupon_type, c.end_time 
+        FROM user_coupons uc
+        JOIN coupons c ON uc.coupon_id = c.id
+        WHERE uc.user_id = ?
+        ORDER BY uc.created_at DESC;
+    )";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return userCoupons;
+    
+    sqlite3_bind_int(stmt, 1, userId);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        models::UserCoupon uc;
+        uc.id = sqlite3_column_int(stmt, 0);
+        uc.user_id = sqlite3_column_int(stmt, 1);
+        uc.coupon_id = sqlite3_column_int(stmt, 2);
+        uc.provider_id = sqlite3_column_int(stmt, 3);
+        uc.status = sqlite3_column_text(stmt, 4) ? (const char*)sqlite3_column_text(stmt, 4) : "";
+        uc.used_at = sqlite3_column_text(stmt, 5) ? (const char*)sqlite3_column_text(stmt, 5) : "";
+        uc.created_at = sqlite3_column_text(stmt, 6) ? (const char*)sqlite3_column_text(stmt, 6) : "";
+        userCoupons.push_back(uc);
+    }
+    sqlite3_finalize(stmt);
+    return userCoupons;
+}
+
+bool DatabaseService::useCoupon(int userCouponId) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const char* sql = "UPDATE user_coupons SET status = 'used', used_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'unused';";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    
+    sqlite3_bind_int(stmt, 1, userCouponId);
+    bool ok = sqlite3_step(stmt) == SQLITE_DONE;
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
+bool DatabaseService::updateCoupon(int id, const models::Coupon& coupon) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const char* sql = "UPDATE coupons SET name=?, description=?, discount_amount=?, min_amount=?, discount_percent=?, status=? WHERE id=?;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    
+    sqlite3_bind_text(stmt, 1, coupon.name.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, coupon.description.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_double(stmt, 3, coupon.discount_amount);
+    sqlite3_bind_double(stmt, 4, coupon.min_amount);
+    sqlite3_bind_int(stmt, 5, coupon.discount_percent);
+    sqlite3_bind_text(stmt, 6, coupon.status.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 7, id);
+    
+    bool ok = sqlite3_step(stmt) == SQLITE_DONE;
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
+bool DatabaseService::deleteCoupon(int id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const char* sql = "DELETE FROM coupons WHERE id=?;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    sqlite3_bind_int(stmt, 1, id);
+    bool ok = sqlite3_step(stmt) == SQLITE_DONE;
+    sqlite3_finalize(stmt);
+    return ok;
 }

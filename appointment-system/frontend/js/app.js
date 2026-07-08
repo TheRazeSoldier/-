@@ -6,6 +6,7 @@ let currentUser = null;
 let currentToken = null;
 let currentProvider = null;
 let currentPage = 'home';
+let currentPageData = null;
 let navigationHistory = [];
 
 // ==================== Helpers ====================
@@ -179,7 +180,7 @@ function navigate(page, data) {
     if (pageEl) pageEl.classList.add('active');
 
     // Show/hide landing page
-    const homePage = document.getElementById('home');
+    const homePage = document.getElementById('page-home');
     if (homePage) homePage.classList.toggle('active', page === 'home');
 
     window.scrollTo(0, 0);
@@ -193,6 +194,7 @@ function navigate(page, data) {
         case 'myAppointments': loadMyAppointments(); break;
         case 'notifications': loadNotifications(); break;
         case 'profile': loadProfile(); break;
+        case 'coupons': loadUserCoupons(); break;
         case 'providerDashboard': loadProviderDashboard(); break;
     }
 }
@@ -209,7 +211,7 @@ function goBack() {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         const pageEl = document.getElementById('page-' + prevPage);
         if (pageEl) pageEl.classList.add('active');
-        const homePage = document.getElementById('home');
+        const homePage = document.getElementById('page-home');
         if (homePage) homePage.classList.toggle('active', prevPage === 'home');
         window.scrollTo(0, 0);
 
@@ -222,6 +224,7 @@ function goBack() {
             case 'myAppointments': loadMyAppointments(); break;
             case 'notifications': loadNotifications(); break;
             case 'profile': loadProfile(); break;
+            case 'coupons': loadUserCoupons(); break;
             case 'providerDashboard': loadProviderDashboard(); break;
         }
     } else {
@@ -307,18 +310,26 @@ function updateNavState() {
     const userNameDisplay = $('userNameDisplay');
     const userAvatar = $('userAvatar');
     const providerLink = $('providerLink');
+    const providerFeatureCard = $('providerFeatureCard');
     
     if (currentUser) {
         navActions.style.display = 'none';
         navUser.style.display = 'flex';
         userNameDisplay.textContent = currentUser.username;
         userAvatar.textContent = currentUser.username.charAt(0).toUpperCase();
-        if (currentUser.role === 'provider') providerLink.style.display = 'block';
+        if (currentUser.role === 'provider') {
+            providerLink.style.display = 'block';
+            if (providerFeatureCard) providerFeatureCard.style.display = 'flex';
+        } else {
+            providerLink.style.display = 'none';
+            if (providerFeatureCard) providerFeatureCard.style.display = 'none';
+        }
         loadUnreadCount();
     } else {
         navActions.style.display = 'flex';
         navUser.style.display = 'none';
         providerLink.style.display = 'none';
+        if (providerFeatureCard) providerFeatureCard.style.display = 'none';
     }
 }
 
@@ -410,16 +421,14 @@ function loadDashboard() {
         return;
     }
 
-    // Set user name
     const nameEl = document.getElementById('dashUserName');
     if (nameEl) nameEl.textContent = currentUser.username;
 
-    // Reset search
     const searchInput = document.getElementById('dashSearch');
     if (searchInput) searchInput.value = '';
 
-    // Load data
     loadPromoServices();
+    loadRecommendedServices();
     loadDashHotServices();
     initScrollReveal();
 }
@@ -467,15 +476,44 @@ function loadPromoServices() {
     });
 }
 
+function loadRecommendedServices() {
+    const container = document.getElementById('dashRecommendedServices');
+    if (!container) return;
+    container.innerHTML = '<div class="loading">加载中</div>';
+
+    api('/api/recommend/services').then(({ data }) => {
+        if (data.services && data.services.length > 0) {
+            container.innerHTML = data.services.map(s => `
+                <div class="service-card reveal" onclick="navigate('serviceDetail', ${s.id})">
+                    <div class="service-card-image ${getCategoryClass(s.category)}">
+                        <span class="icon-text">${getCategoryIcon(s.category)}</span>
+                        ${s.has_coupon ? '<span class="coupon-badge">券</span>' : ''}
+                    </div>
+                    <div class="service-card-body">
+                        <h3>${escHtml(s.name)}</h3>
+                        <p class="service-provider">${escHtml(s.provider_name || '')}</p>
+                        <p class="service-desc">${escHtml(s.description).substring(0, 60)}</p>
+                        <div class="service-card-meta">
+                            <span class="service-price">${s.price > 0 ? '¥' + s.price : '免费'}</span>
+                            <span class="service-duration">${s.duration}分钟</span>
+                            <span class="service-rating">★ ${(s.avg_rating || 0).toFixed(1)}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            initScrollReveal();
+        } else {
+            container.innerHTML = '<div class="empty-state"><div class="empty-icon">✨</div><h3>暂无推荐服务</h3></div>';
+        }
+    });
+}
+
 function loadDashHotServices() {
     const container = document.getElementById('dashHotServices');
     if (!container) return;
     container.innerHTML = '<div class="loading">加载中</div>';
 
-    const params = new URLSearchParams();
-    if (dashCategory) params.append('category', dashCategory);
-
-    api('/api/services?' + params.toString()).then(({ data }) => {
+    api('/api/recommend/hot').then(({ data }) => {
         if (data.services && data.services.length > 0) {
             const hot = data.services.slice(0, 6);
             container.innerHTML = hot.map(s => `
@@ -522,27 +560,52 @@ function filterDashCategory(category, btn) {
     document.querySelectorAll('.quick-cat').forEach(c => c.classList.remove('active'));
     if (btn) btn.classList.add('active');
     loadPromoServices();
+    loadRecommendedServices();
     loadDashHotServices();
+}
+
+function clearFilters() {
+    $('priceMin').value = '';
+    $('priceMax').value = '';
+    $('durationMin').value = '';
+    $('durationMax').value = '';
+    $('sortBy').value = '';
+    $('sortOrder').value = 'asc';
+    loadServices();
 }
 
 // ==================== Services ====================
 function loadServices() {
     const keyword = $('serviceSearch')?.value || '';
     const category = $('serviceCategoryFilter')?.value || '';
+    const minPrice = $('priceMin')?.value || '';
+    const maxPrice = $('priceMax')?.value || '';
+    const minDuration = $('durationMin')?.value || '';
+    const maxDuration = $('durationMax')?.value || '';
+    const sortBy = $('sortBy')?.value || '';
+    const sortOrder = $('sortOrder')?.value || '';
+    
     const params = new URLSearchParams();
     if (keyword) params.append('keyword', keyword);
     if (category) params.append('category', category);
+    if (minPrice) params.append('min_price', minPrice);
+    if (maxPrice) params.append('max_price', maxPrice);
+    if (minDuration) params.append('min_duration', minDuration);
+    if (maxDuration) params.append('max_duration', maxDuration);
+    if (sortBy) params.append('sort_by', sortBy);
+    if (sortOrder) params.append('sort_order', sortOrder);
     
     const container = document.getElementById('allServices');
     if (!container) return;
     container.innerHTML = '<div class="loading">加载中</div>';
     
-    api('/api/services?' + params.toString()).then(({ data }) => {
+    api('/api/services/search?' + params.toString()).then(({ data }) => {
         if (data.services && data.services.length > 0) {
             container.innerHTML = data.services.map(s => `
                 <div class="service-card" onclick="navigate('serviceDetail', ${s.id})">
                     <div class="service-card-image ${getCategoryClass(s.category)}">
                         <span class="icon-text">${getCategoryIcon(s.category)}</span>
+                        ${s.has_coupon ? '<span class="coupon-badge">券</span>' : ''}
                     </div>
                     <div class="service-card-body">
                         <h3>${escHtml(s.name)}</h3>
@@ -892,6 +955,7 @@ function loadProviderDashboard() {
                             <div class="dashboard-tabs">
                                 <button class="dashboard-tab active" onclick="switchDashboardTab('services', this)">我的服务</button>
                                 <button class="dashboard-tab" onclick="switchDashboardTab('appointments', this)">预约管理</button>
+                                <button class="dashboard-tab" onclick="switchDashboardTab('coupons', this)">优惠券管理</button>
                                 <button class="dashboard-tab" onclick="switchDashboardTab('info', this)">服务商信息</button>
                             </div>
                             <div id="dashboardTabContent">
@@ -939,6 +1003,9 @@ function loadProviderDashboard() {
                                         </div>
                                     `).join('') : '<div class="empty-state"><p>暂无预约</p></div>'}
                                 </div>
+                                <div id="tab-coupons" style="display:none;">
+                                    <div id="couponsTabContent"></div>
+                                </div>
                                 <div id="tab-info" style="display:none;">
                                     <div class="profile-card">
                                         <form onsubmit="updateProviderInfo(event)">
@@ -967,7 +1034,9 @@ function switchDashboardTab(tab, btn) {
     btn.classList.add('active');
     document.getElementById('tab-services').style.display = tab === 'services' ? 'block' : 'none';
     document.getElementById('tab-appointments').style.display = tab === 'appointments' ? 'block' : 'none';
+    document.getElementById('tab-coupons').style.display = tab === 'coupons' ? 'block' : 'none';
     document.getElementById('tab-info').style.display = tab === 'info' ? 'block' : 'none';
+    if (tab === 'coupons') loadProviderCoupons();
 }
 
 function updateProviderInfo(e) {
@@ -1022,6 +1091,197 @@ function deleteService(id) {
     api('/api/services/' + id, { method: 'DELETE' }).then(({ status, data }) => {
         if (status === 200) { showToast('服务已删除', 'success'); loadProviderDashboard(); }
         else { showToast(data.error || '删除失败', 'error'); }
+    });
+}
+
+// ==================== Coupons ====================
+function toggleCouponAmount() {
+    const type = $('couponType').value;
+    const label = $('couponAmountLabel');
+    const input = $('couponAmount');
+    if (type === 'fixed') {
+        label.textContent = '优惠金额 (元)';
+        input.step = '0.01';
+    } else {
+        label.textContent = '折扣百分比 (%)';
+        input.step = '1';
+        input.max = '100';
+    }
+}
+
+function loadProviderCoupons() {
+    const container = document.getElementById('couponsTabContent');
+    if (!container) return;
+    container.innerHTML = '<div class="loading">加载中</div>';
+    
+    api('/api/coupons/provider').then(({ data }) => {
+        if (data.coupons && data.coupons.length > 0) {
+            container.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h3>我的优惠券</h3>
+                    <button class="btn btn-primary btn-sm" onclick="openAddCouponModal()">创建优惠券</button>
+                </div>
+                <div class="coupons-grid">
+                    ${data.coupons.map(c => `
+                        <div class="coupon-card">
+                            <div class="coupon-left">
+                                <span class="coupon-amount">${c.coupon_type === 'fixed' ? '¥' + c.discount_amount : c.discount_percent + '%'}</span>
+                                <span class="coupon-condition">满${c.min_amount}可用</span>
+                            </div>
+                            <div class="coupon-right">
+                                <h4>${escHtml(c.name)}</h4>
+                                <p>${escHtml(c.description)}</p>
+                                <div class="coupon-info">
+                                    <span>总量: ${c.total_count}</span>
+                                    <span>已用: ${c.used_count}</span>
+                                    <span>状态: ${c.status === 'active' ? '生效中' : '已过期'}</span>
+                                </div>
+                                <div class="coupon-actions">
+                                    <button class="btn btn-outline btn-sm" onclick="editCoupon(${c.id})">编辑</button>
+                                    <button class="btn btn-primary btn-sm" style="background:#EF4444;" onclick="deleteCoupon(${c.id})">删除</button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        } else {
+            container.innerHTML = `<div class="empty-state"><p>还没有创建优惠券</p><button class="btn btn-primary btn-sm" onclick="openAddCouponModal()">创建优惠券</button></div>`;
+        }
+    });
+}
+
+function openAddCouponModal(couponData) {
+    const modal = document.getElementById('addCouponModal');
+    if (!modal) return;
+    
+    if (couponData) {
+        $('couponTitle').textContent = '编辑优惠券';
+        $('editCouponId').value = couponData.id;
+        $('couponName').value = couponData.name;
+        $('couponDesc').value = couponData.description;
+        $('couponType').value = couponData.coupon_type;
+        $('couponAmount').value = couponData.coupon_type === 'fixed' ? couponData.discount_amount : couponData.discount_percent;
+        $('couponMinAmount').value = couponData.min_amount;
+        $('couponTotalCount').value = couponData.total_count;
+        $('couponStartTime').value = couponData.start_time ? couponData.start_time.split(' ')[0] : '';
+        $('couponEndTime').value = couponData.end_time ? couponData.end_time.split(' ')[0] : '';
+    } else {
+        $('couponTitle').textContent = '创建优惠券';
+        $('editCouponId').value = '';
+        $('couponName').value = '';
+        $('couponDesc').value = '';
+        $('couponType').value = 'fixed';
+        $('couponAmount').value = '';
+        $('couponMinAmount').value = '';
+        $('couponTotalCount').value = '100';
+        const today = new Date().toISOString().split('T')[0];
+        $('couponStartTime').value = today;
+        const nextMonth = new Date();
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        $('couponEndTime').value = nextMonth.toISOString().split('T')[0];
+    }
+    $('addCouponError').textContent = '';
+    showModal('addCouponModal');
+}
+
+function editCoupon(id) {
+    api('/api/coupons/' + id).then(({ data }) => {
+        if (data.coupon) {
+            openAddCouponModal(data.coupon);
+        }
+    });
+}
+
+function handleAddCoupon(e) {
+    e.preventDefault();
+    const errorEl = $('addCouponError');
+    errorEl.textContent = '';
+    
+    const data = {
+        name: $('couponName').value.trim(),
+        description: $('couponDesc').value.trim(),
+        coupon_type: $('couponType').value,
+        discount_amount: $('couponType').value === 'fixed' ? parseFloat($('couponAmount').value) || 0 : 0,
+        discount_percent: $('couponType').value === 'percent' ? parseInt($('couponAmount').value) || 0 : 0,
+        min_amount: parseFloat($('couponMinAmount').value) || 0,
+        total_count: parseInt($('couponTotalCount').value) || 100,
+        start_time: $('couponStartTime').value,
+        end_time: $('couponEndTime').value
+    };
+    
+    const editId = $('editCouponId').value;
+    const url = editId ? '/api/coupons/' + editId : '/api/coupons';
+    const method = editId ? 'PUT' : 'POST';
+    
+    api(url, { method, body: JSON.stringify(data) }).then(({ status, data: resp }) => {
+        if (status === 200) {
+            closeModal('addCouponModal');
+            showToast(editId ? '优惠券更新成功！' : '优惠券创建成功！', 'success');
+            loadProviderCoupons();
+        } else {
+            errorEl.textContent = resp.error || '操作失败';
+        }
+    });
+}
+
+function deleteCoupon(id) {
+    if (!confirm('确定要删除这个优惠券吗？')) return;
+    api('/api/coupons/' + id, { method: 'DELETE' }).then(({ status, data }) => {
+        if (status === 200) { showToast('优惠券已删除', 'success'); loadProviderCoupons(); }
+        else { showToast(data.error || '删除失败', 'error'); }
+    });
+}
+
+function loadUserCoupons() {
+    const container = document.getElementById('userCouponsContent');
+    if (!container) return;
+    container.innerHTML = '<div class="loading">加载中</div>';
+    
+    api('/api/coupons/user').then(({ data }) => {
+        if (data.user_coupons && data.user_coupons.length > 0) {
+            container.innerHTML = data.user_coupons.map(uc => `
+                <div class="coupon-card ${uc.status === 'used' ? 'used' : ''}">
+                    <div class="coupon-left">
+                        <span class="coupon-amount">${uc.coupon_type === 'fixed' ? '¥' + uc.discount_amount : uc.discount_percent + '%'}</span>
+                        <span class="coupon-condition">满${uc.min_amount}可用</span>
+                    </div>
+                    <div class="coupon-right">
+                        <h4>${escHtml(uc.coupon_name)}</h4>
+                        <p>${escHtml(uc.provider_name || '')}</p>
+                        <div class="coupon-info">
+                            <span>有效期: ${formatDate(uc.start_time)} - ${formatDate(uc.end_time)}</span>
+                            <span>状态: ${uc.status === 'unused' ? '未使用' : uc.status === 'used' ? '已使用' : '已过期'}</span>
+                        </div>
+                        ${uc.status === 'unused' ? `<button class="btn btn-primary btn-sm" onclick="useUserCoupon(${uc.id})">去使用</button>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="empty-state"><div class="empty-icon">🎫</div><h3>暂无优惠券</h3><p>快去领取优惠券吧！</p></div>';
+        }
+    });
+}
+
+function claimCoupon(couponId) {
+    api('/api/coupons/' + couponId + '/claim', { method: 'POST' }).then(({ status, data }) => {
+        if (status === 200) {
+            showToast('领取成功！', 'success');
+            loadUserCoupons();
+        } else {
+            showToast(data.error || '领取失败', 'error');
+        }
+    });
+}
+
+function useUserCoupon(userCouponId) {
+    api('/api/coupons/user/' + userCouponId + '/use', { method: 'POST' }).then(({ status, data }) => {
+        if (status === 200) {
+            showToast('优惠券使用成功！', 'success');
+            loadUserCoupons();
+        } else {
+            showToast(data.error || '使用失败', 'error');
+        }
     });
 }
 

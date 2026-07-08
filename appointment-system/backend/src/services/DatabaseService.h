@@ -23,7 +23,9 @@ public:
     models::Provider getProviderByUserId(int userId);
     std::vector<models::Provider> getAllProviders();
     std::vector<models::Provider> getProvidersByCategory(const std::string& category);
+    std::vector<models::Provider> getProvidersByAuditStatus(const std::string& auditStatus);
     bool updateProvider(int id, const models::Provider& provider);
+    bool auditProvider(int id, const std::string& auditStatus, const std::string& auditComment);
 
     // Services
     int createService(const models::Service& service);
@@ -31,6 +33,9 @@ public:
     std::vector<models::Service> getServicesByProvider(int providerId);
     std::vector<models::Service> getAllServices();
     std::vector<models::Service> searchServices(const std::string& keyword, const std::string& category);
+    std::vector<models::Service> advancedSearchServices(const std::string& keyword, const std::string& category, double minPrice, double maxPrice, int minDuration, int maxDuration, const std::string& sortBy, const std::string& sortOrder);
+    std::vector<models::Service> getRecommendedServices(int userId, int limit);
+    std::vector<std::string> getAllCategories();
     bool updateService(int id, const models::Service& service);
     bool deleteService(int id);
 
@@ -55,6 +60,17 @@ public:
     std::vector<models::Notification> getNotificationsByUser(int userId);
     bool markNotificationRead(int id);
     int getUnreadNotificationCount(int userId);
+
+    // Coupons
+    int createCoupon(const models::Coupon& coupon);
+    models::Coupon getCouponById(int id);
+    std::vector<models::Coupon> getCouponsByProvider(int providerId);
+    std::vector<models::Coupon> getAvailableCoupons(int providerId);
+    int claimCoupon(int userId, int couponId);
+    std::vector<models::UserCoupon> getUserCoupons(int userId);
+    bool useCoupon(int userCouponId);
+    bool updateCoupon(int id, const models::Coupon& coupon);
+    bool deleteCoupon(int id);
 
     // Stats
     models::Stats getStats();
