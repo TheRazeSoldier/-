@@ -1,0 +1,11 @@
+*.exe
+*.o
+obj/
+src/*.o
+src/config/*.o
+src/controllers/*.o
+src/middleware/*.o
+src/services/*.o
+*.db
+*.log
+.DS_Store
