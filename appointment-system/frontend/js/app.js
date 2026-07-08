@@ -1772,4 +1772,168 @@ document.addEventListener('DOMContentLoaded', () => {
     handleNavScroll();
     updateScrollProgress();
     updateBackToTop();
+}
+
+// ==================== Audit Management ====================
+let currentAuditProvider = null;
+
+function loadAuditPage() {
+    if (!currentUser || currentUser.role !== 'admin') {
+        showToast('请以管理员身份登录', 'warning');
+        showModal('loginModal');
+        return;
+    }
+    loadAuditList('all');
+}
+
+function switchAuditTab(tab, el) {
+    document.querySelectorAll('.audit-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    loadAuditList(tab);
+}
+
+function loadAuditList(status) {
+    const container = $('auditList');
+    if (!container) return;
+    container.innerHTML = '<div class="loading">加载中...</div>';
+
+    let url = '/api/audit/providers';
+    if (status === 'pending') url = '/api/audit/providers/first_pending';
+    else if (status === 'first_approved') url = '/api/audit/providers/second_pending';
+
+    api(url).then(({ data }) => {
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><h3>暂无数据</h3></div>';
+            return;
+        }
+
+        let filteredData = data;
+        if (status === 'approved') {
+            filteredData = data.filter(p => p.audit_status === 'approved');
+        } else if (status === 'rejected') {
+            filteredData = data.filter(p => p.audit_status === 'rejected' || p.audit_status === 'first_rejected');
+        }
+
+        if (filteredData.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><h3>暂无数据</h3></div>';
+            return;
+        }
+
+        container.innerHTML = filteredData.map(p => `
+            <div class="audit-card" onclick="openAuditModal(${p.id})">
+                <div class="audit-card-header">
+                    <span class="audit-card-name">${escHtml(p.name)}</span>
+                    <span class="audit-card-status ${p.audit_status}">${getAuditStatusText(p.audit_status)}</span>
+                </div>
+                <div class="audit-card-info">
+                    <span>👤 ${escHtml(p.username)}</span>
+                    <span>📧 ${escHtml(p.email)}</span>
+                    <span>📁 ${escHtml(p.category || '未分类')}</span>
+                </div>
+                <div class="audit-card-meta">
+                    <span>创建时间: ${formatDateTime(p.created_at)}</span>
+                    ${p.first_audit_at ? `<span>初审时间: ${formatDateTime(p.first_audit_at)}</span>` : ''}
+                    ${p.second_audit_at ? `<span>复审时间: ${formatDateTime(p.second_audit_at)}</span>` : ''}
+                </div>
+            </div>
+        `).join('');
+    });
+}
+
+function getAuditStatusText(status) {
+    const map = {
+        'pending': '待初审',
+        'first_approved': '待复审',
+        'first_rejected': '初审驳回',
+        'approved': '已通过',
+        'rejected': '已驳回'
+    };
+    return map[status] || status;
+}
+
+function openAuditModal(providerId) {
+    const modal = document.getElementById('auditModal');
+    if (!modal) return;
+
+    api('/api/audit/providers/' + providerId + '/records').then(({ data: records }) => {
+        api('/api/providers/' + providerId).then(({ data: providerData }) => {
+            const p = providerData.provider || providerData;
+
+            currentAuditProvider = p;
+
+            $('auditProviderName').textContent = p.name || '-';
+            $('auditUsername').textContent = p.username || '-';
+            $('auditEmail').textContent = p.email || '-';
+            $('auditPhone').textContent = p.phone || '-';
+            $('auditCategory').textContent = p.category || '-';
+            $('auditAddress').textContent = p.address || '-';
+            $('auditLicense').textContent = p.license_number || '-';
+            $('auditStatus').textContent = getAuditStatusText(p.audit_status);
+            $('auditCreatedAt').textContent = formatDateTime(p.created_at);
+
+            const historyContainer = $('auditHistoryList');
+            if (records && records.length > 0) {
+                historyContainer.innerHTML = records.map(r => `
+                    <div class="history-item">
+                        <div class="history-header">
+                            <span class="history-stage">${r.audit_stage === 'first' ? '初审' : '复审'}</span>
+                            <span class="history-status ${r.status}">${r.status === 'approved' ? '通过' : '驳回'}</span>
+                        </div>
+                        <div class="history-comment">${escHtml(r.comment) || '无'}</div>
+                        <div class="history-time">审核人: ${escHtml(r.auditor_name)} · ${formatDateTime(r.created_at)}</div>
+                    </div>
+                `).join('');
+            } else {
+                historyContainer.innerHTML = '<div style="color:var(--mid-gray);">暂无审核记录</div>';
+            }
+
+            const actionContainer = $('auditAction');
+            $('auditComment').value = '';
+
+            if (p.audit_status === 'pending') {
+                $('auditModalTitle').textContent = '初审服务商';
+                actionContainer.style.display = 'block';
+            } else if (p.audit_status === 'first_approved') {
+                $('auditModalTitle').textContent = '复审服务商';
+                actionContainer.style.display = 'block';
+            } else {
+                $('auditModalTitle').textContent = '审核详情';
+                actionContainer.style.display = 'none';
+            }
+
+            showModal('auditModal');
+        });
+    });
+}
+
+function handleAudit(status) {
+    if (!currentAuditProvider) return;
+
+    const comment = $('auditComment').value.trim();
+    if (!comment) {
+        showToast('请输入审核意见', 'warning');
+        return;
+    }
+
+    const providerId = currentAuditProvider.id;
+    const auditStage = currentAuditProvider.audit_status === 'pending' ? 'first' : 'second';
+    const url = '/api/audit/providers/' + providerId + '/' + auditStage;
+
+    const data = {
+        status: status,
+        comment: comment,
+        auditor_id: currentUser.id,
+        auditor_name: currentUser.username
+    };
+
+    api(url, { method: 'POST', body: JSON.stringify(data) }).then(({ status: respStatus, data: resp }) => {
+        if (respStatus === 200) {
+            showToast(status === 'approved' ? '审核通过！' : '审核驳回', 'success');
+            closeModal('auditModal');
+            loadAuditList(document.querySelector('.audit-tab.active')?.dataset.tab || 'all');
+        } else {
+            showToast(resp.error || '审核操作失败', 'error');
+        }
+    });
+}
 });

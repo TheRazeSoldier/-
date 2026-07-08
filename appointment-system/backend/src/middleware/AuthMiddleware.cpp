@@ -42,3 +42,19 @@ bool AuthMiddleware::requireRole(const httplib::Request& req, httplib::Response&
     }
     return true;
 }
+
+std::function<void(const httplib::Request&, httplib::Response&)> AuthMiddleware::adminOnly(
+    std::function<void(const httplib::Request&, httplib::Response&)> handler) {
+    return [handler](const httplib::Request& req, httplib::Response& res) {
+        AuthUser authUser{};
+        if (!requireAuth(req, res, authUser)) {
+            return;
+        }
+        if (authUser.role != "admin") {
+            res.status = 403;
+            res.set_content(json{{"error", "无权限访问"}}.dump(), "application/json");
+            return;
+        }
+        handler(req, res);
+    };
+}

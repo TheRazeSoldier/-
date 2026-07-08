@@ -31,6 +31,23 @@ struct Provider {
     std::string audit_comment;
     std::string license_number;
     std::string license_image;
+    int first_audit_user_id;
+    std::string first_audit_at;
+    std::string first_audit_comment;
+    int second_audit_user_id;
+    std::string second_audit_at;
+    std::string second_audit_comment;
+    std::string created_at;
+};
+
+struct AuditRecord {
+    int id;
+    int provider_id;
+    std::string audit_stage;
+    std::string status;
+    int auditor_id;
+    std::string auditor_name;
+    std::string comment;
     std::string created_at;
 };
 

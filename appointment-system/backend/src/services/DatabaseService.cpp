@@ -47,8 +47,31 @@ bool DatabaseService::migrateDatabase() {
     sqlite3_exec(db_, "ALTER TABLE providers ADD COLUMN IF NOT EXISTS audit_comment TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
     sqlite3_exec(db_, "ALTER TABLE providers ADD COLUMN IF NOT EXISTS license_number TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
     sqlite3_exec(db_, "ALTER TABLE providers ADD COLUMN IF NOT EXISTS license_image TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
+    sqlite3_exec(db_, "ALTER TABLE providers ADD COLUMN IF NOT EXISTS first_audit_user_id INTEGER DEFAULT 0;", nullptr, nullptr, &errMsg);
+    sqlite3_exec(db_, "ALTER TABLE providers ADD COLUMN IF NOT EXISTS first_audit_at TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
+    sqlite3_exec(db_, "ALTER TABLE providers ADD COLUMN IF NOT EXISTS first_audit_comment TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
+    sqlite3_exec(db_, "ALTER TABLE providers ADD COLUMN IF NOT EXISTS second_audit_user_id INTEGER DEFAULT 0;", nullptr, nullptr, &errMsg);
+    sqlite3_exec(db_, "ALTER TABLE providers ADD COLUMN IF NOT EXISTS second_audit_at TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
+    sqlite3_exec(db_, "ALTER TABLE providers ADD COLUMN IF NOT EXISTS second_audit_comment TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
     
     sqlite3_exec(db_, "ALTER TABLE services ADD COLUMN IF NOT EXISTS image TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
+    
+    const char* createAuditTable = R"(
+        CREATE TABLE IF NOT EXISTS audit_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider_id INTEGER REFERENCES providers(id),
+            audit_stage TEXT NOT NULL,
+            status TEXT NOT NULL,
+            auditor_id INTEGER REFERENCES users(id),
+            auditor_name TEXT DEFAULT '',
+            comment TEXT DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_records_provider ON audit_records(provider_id);
+        CREATE INDEX IF NOT EXISTS idx_audit_records_stage ON audit_records(audit_stage);
+        CREATE INDEX IF NOT EXISTS idx_audit_records_auditor ON audit_records(auditor_id);
+    )";
+    sqlite3_exec(db_, createAuditTable, nullptr, nullptr, &errMsg);
     
     createDefaultAdmin();
     
@@ -1229,6 +1252,138 @@ bool DatabaseService::auditProvider(int id, const std::string& auditStatus, cons
     bool ok = sqlite3_step(stmt) == SQLITE_DONE;
     sqlite3_finalize(stmt);
     return ok;
+}
+
+bool DatabaseService::firstAuditProvider(int providerId, const std::string& status, const std::string& comment, int auditorId, const std::string& auditorName) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    sqlite3_exec(db_, "BEGIN TRANSACTION;", nullptr, nullptr, nullptr);
+    
+    const char* sql = "UPDATE providers SET first_audit_user_id=?, first_audit_at=CURRENT_TIMESTAMP, first_audit_comment=?, audit_status=? WHERE id=?;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+        return false;
+    }
+    
+    sqlite3_bind_int(stmt, 1, auditorId);
+    sqlite3_bind_text(stmt, 2, comment.c_str(), -1, SQLITE_TRANSIENT);
+    
+    if (status == "approved") {
+        sqlite3_bind_text(stmt, 3, "first_approved", -1, SQLITE_TRANSIENT);
+    } else {
+        sqlite3_bind_text(stmt, 3, "first_rejected", -1, SQLITE_TRANSIENT);
+    }
+    sqlite3_bind_int(stmt, 4, providerId);
+    
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        sqlite3_finalize(stmt);
+        sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+        return false;
+    }
+    sqlite3_finalize(stmt);
+    
+    const char* insertSql = "INSERT INTO audit_records (provider_id, audit_stage, status, auditor_id, auditor_name, comment) VALUES (?, 'first', ?, ?, ?, ?);";
+    if (sqlite3_prepare_v2(db_, insertSql, -1, &stmt, nullptr) != SQLITE_OK) {
+        sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+        return false;
+    }
+    
+    sqlite3_bind_int(stmt, 1, providerId);
+    sqlite3_bind_text(stmt, 2, status.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 3, auditorId);
+    sqlite3_bind_text(stmt, 4, auditorName.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 5, comment.c_str(), -1, SQLITE_TRANSIENT);
+    
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        sqlite3_finalize(stmt);
+        sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+        return false;
+    }
+    sqlite3_finalize(stmt);
+    
+    sqlite3_exec(db_, "COMMIT;", nullptr, nullptr, nullptr);
+    return true;
+}
+
+bool DatabaseService::secondAuditProvider(int providerId, const std::string& status, const std::string& comment, int auditorId, const std::string& auditorName) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    sqlite3_exec(db_, "BEGIN TRANSACTION;", nullptr, nullptr, nullptr);
+    
+    const char* sql = "UPDATE providers SET second_audit_user_id=?, second_audit_at=CURRENT_TIMESTAMP, second_audit_comment=?, audit_status=?, status=? WHERE id=?;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+        return false;
+    }
+    
+    sqlite3_bind_int(stmt, 1, auditorId);
+    sqlite3_bind_text(stmt, 2, comment.c_str(), -1, SQLITE_TRANSIENT);
+    
+    if (status == "approved") {
+        sqlite3_bind_text(stmt, 3, "approved", -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 4, "active", -1, SQLITE_TRANSIENT);
+    } else {
+        sqlite3_bind_text(stmt, 3, "rejected", -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 4, "inactive", -1, SQLITE_TRANSIENT);
+    }
+    sqlite3_bind_int(stmt, 5, providerId);
+    
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        sqlite3_finalize(stmt);
+        sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+        return false;
+    }
+    sqlite3_finalize(stmt);
+    
+    const char* insertSql = "INSERT INTO audit_records (provider_id, audit_stage, status, auditor_id, auditor_name, comment) VALUES (?, 'second', ?, ?, ?, ?);";
+    if (sqlite3_prepare_v2(db_, insertSql, -1, &stmt, nullptr) != SQLITE_OK) {
+        sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+        return false;
+    }
+    
+    sqlite3_bind_int(stmt, 1, providerId);
+    sqlite3_bind_text(stmt, 2, status.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 3, auditorId);
+    sqlite3_bind_text(stmt, 4, auditorName.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 5, comment.c_str(), -1, SQLITE_TRANSIENT);
+    
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        sqlite3_finalize(stmt);
+        sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, nullptr);
+        return false;
+    }
+    sqlite3_finalize(stmt);
+    
+    sqlite3_exec(db_, "COMMIT;", nullptr, nullptr, nullptr);
+    return true;
+}
+
+std::vector<models::AuditRecord> DatabaseService::getAuditRecordsByProvider(int providerId) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::AuditRecord> records;
+    const char* sql = "SELECT * FROM audit_records WHERE provider_id = ? ORDER BY created_at DESC;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return records;
+    
+    sqlite3_bind_int(stmt, 1, providerId);
+    
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        models::AuditRecord record;
+        record.id = sqlite3_column_int(stmt, 0);
+        record.provider_id = sqlite3_column_int(stmt, 1);
+        record.audit_stage = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+        record.status = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+        record.auditor_id = sqlite3_column_int(stmt, 4);
+        record.auditor_name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
+        record.comment = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6));
+        record.created_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 7));
+        records.push_back(record);
+    }
+    
+    sqlite3_finalize(stmt);
+    return records;
 }
 
 std::vector<models::Provider> DatabaseService::getProvidersByAuditStatus(const std::string& auditStatus) {

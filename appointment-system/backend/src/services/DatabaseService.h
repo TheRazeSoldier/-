@@ -27,6 +27,9 @@ public:
     std::vector<models::Provider> getProvidersByAuditStatus(const std::string& auditStatus);
     bool updateProvider(int id, const models::Provider& provider);
     bool auditProvider(int id, const std::string& auditStatus, const std::string& auditComment);
+    bool firstAuditProvider(int providerId, const std::string& status, const std::string& comment, int auditorId, const std::string& auditorName);
+    bool secondAuditProvider(int providerId, const std::string& status, const std::string& comment, int auditorId, const std::string& auditorName);
+    std::vector<models::AuditRecord> getAuditRecordsByProvider(int providerId);
 
     // Services
     int createService(const models::Service& service);

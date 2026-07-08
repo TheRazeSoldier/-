@@ -17,4 +17,7 @@ public:
     
     static bool requireRole(const httplib::Request& req, httplib::Response& res, 
                             AuthUser& authUser, const std::string& requiredRole);
+    
+    static std::function<void(const httplib::Request&, httplib::Response&)> adminOnly(
+        std::function<void(const httplib::Request&, httplib::Response&)> handler);
 };

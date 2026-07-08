@@ -468,6 +468,15 @@
                                 <p>查看统计数据和趋势</p>
                             </div>
                         </div>
+                        <div class="feature-card" id="auditFeatureCard" style="display:none;" onclick="navigate('audit')">
+                            <div class="feature-icon accent-blue-bg">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 0 0 1.946-.806 3.42 3.42 0 0 1 4.438 0 3.42 3.42 0 0 0 1.946.806 3.42 3.42 0 0 1 3.138 3.138 3.42 3.42 0 0 0 .806 1.946 3.42 3.42 0 0 1 0 4.438 3.42 3.42 0 0 0-.806 1.946 3.42 3.42 0 0 1-3.138 3.138 3.42 3.42 0 0 0-1.946.806 3.42 3.42 0 0 1-4.438 0 3.42 3.42 0 0 0-1.946-.806 3.42 3.42 0 0 1-3.138-3.138 3.42 3.42 0 0 0-.806-1.946 3.42 3.42 0 0 1 0-4.438 3.42 3.42 0 0 0 .806-1.946 3.42 3.42 0 0 1 3.138-3.138z"/></svg>
+                            </div>
+                            <div class="feature-info">
+                                <h3>服务商审核</h3>
+                                <p>管理服务商资质审核</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -709,6 +718,91 @@
                 </div>
             </div>
         </section>
+
+        <section id="page-audit" class="page">
+            <div class="page-header">
+                <button class="page-back" onclick="goBack()">← 返回</button>
+                <h1>服务商审核管理</h1>
+            </div>
+
+            <div id="auditContent">
+                <div class="audit-tabs">
+                    <button class="audit-tab active" data-tab="all" onclick="switchAuditTab('all', this)">全部</button>
+                    <button class="audit-tab" data-tab="pending" onclick="switchAuditTab('pending', this)">待初审</button>
+                    <button class="audit-tab" data-tab="first_approved" onclick="switchAuditTab('first_approved', this)">待复审</button>
+                    <button class="audit-tab" data-tab="approved" onclick="switchAuditTab('approved', this)">已通过</button>
+                    <button class="audit-tab" data-tab="rejected" onclick="switchAuditTab('rejected', this)">已驳回</button>
+                </div>
+
+                <div class="audit-list" id="auditList">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </section>
+
+        <div class="modal" id="auditModal">
+            <div class="modal-content" style="max-width:600px;">
+                <span class="modal-close" onclick="closeModal('auditModal')">&times;</span>
+                <h2 id="auditModalTitle">审核详情</h2>
+                
+                <div id="auditModalBody">
+                    <div class="audit-detail">
+                        <div class="detail-row">
+                            <span class="detail-label">服务商名称</span>
+                            <span class="detail-value" id="auditProviderName">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">用户名</span>
+                            <span class="detail-value" id="auditUsername">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">邮箱</span>
+                            <span class="detail-value" id="auditEmail">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">手机号</span>
+                            <span class="detail-value" id="auditPhone">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">分类</span>
+                            <span class="detail-value" id="auditCategory">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">地址</span>
+                            <span class="detail-value" id="auditAddress">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">营业执照号</span>
+                            <span class="detail-value" id="auditLicense">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">审核状态</span>
+                            <span class="detail-value" id="auditStatus">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">创建时间</span>
+                            <span class="detail-value" id="auditCreatedAt">-</span>
+                        </div>
+                    </div>
+
+                    <div class="audit-history">
+                        <h3>审核记录</h3>
+                        <div id="auditHistoryList">暂无审核记录</div>
+                    </div>
+
+                    <div class="audit-action" id="auditAction">
+                        <div class="form-group">
+                            <label>审核意见</label>
+                            <textarea id="auditComment" rows="3" placeholder="请输入审核意见"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-danger" onclick="handleAudit('rejected')">驳回</button>
+                            <button class="btn btn-success" onclick="handleAudit('approved')">通过</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <!-- Modals -->

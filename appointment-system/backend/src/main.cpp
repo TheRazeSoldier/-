@@ -10,6 +10,7 @@
 #include "controllers/StatsController.h"
 #include "controllers/RecommendController.h"
 #include "controllers/CouponController.h"
+#include "controllers/AuditController.h"
 #include <iostream>
 #include <csignal>
 
@@ -43,6 +44,7 @@ void setupRoutes(httplib::Server& svr) {
     StatsController::registerRoutes(svr);
     RecommendController::registerRoutes(svr);
     CouponController::registerRoutes(svr);
+    AuditController::registerRoutes(svr);
 }
 
 int main() {
