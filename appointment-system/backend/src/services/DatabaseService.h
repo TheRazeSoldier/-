@@ -74,6 +74,12 @@ public:
 
     // Stats
     models::Stats getStats();
+    models::TrendStats getTrendStats(const std::string& startDate, const std::string& endDate);
+    models::CouponStats getCouponStats();
+    std::vector<models::DailyStats> getDailyStats(const std::string& startDate, const std::string& endDate);
+    std::vector<models::CategoryStats> getCategoryStats();
+    std::vector<models::ProviderStats> getProviderStats();
+    std::vector<models::AppointmentStats> getAppointmentStatusStats();
 
 private:
     DatabaseService() = default;
@@ -82,6 +88,7 @@ private:
     DatabaseService& operator=(const DatabaseService&) = delete;
 
     bool createTables();
+    bool migrateDatabase();
     bool executeSQL(const std::string& sql);
     sqlite3* db_ = nullptr;
     std::mutex mutex_;

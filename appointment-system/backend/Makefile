@@ -16,6 +16,8 @@ SRCS = src/main.cpp \
        src/controllers/ReviewController.cpp \
        src/controllers/NotificationController.cpp \
        src/controllers/StatsController.cpp \
+       src/controllers/RecommendController.cpp \
+       src/controllers/CouponController.cpp \
        src/sqlite3.c
 
 OBJS = src/main.o \
@@ -30,6 +32,8 @@ OBJS = src/main.o \
        src/controllers/ReviewController.o \
        src/controllers/NotificationController.o \
        src/controllers/StatsController.o \
+       src/controllers/RecommendController.o \
+       src/controllers/CouponController.o \
        src/sqlite3.o
 
 .PHONY: all clean run

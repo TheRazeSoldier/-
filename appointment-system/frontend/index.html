@@ -459,6 +459,15 @@
                                 <p>查看和管理预约</p>
                             </div>
                         </div>
+                        <div class="feature-card" onclick="navigate('reports')">
+                            <div class="feature-icon accent-purple-bg">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M18 20V10M8 20V4M3 14h18"/></svg>
+                            </div>
+                            <div class="feature-info">
+                                <h3>数据报表</h3>
+                                <p>查看统计数据和趋势</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -630,6 +639,74 @@
                 <h1>服务商管理</h1></div>
             <div id="providerDashboardContent">
                 <div class="loading">加载中</div>
+            </div>
+        </section>
+
+        <section id="page-reports" class="page">
+            <div class="page-header">
+                <button class="page-back" onclick="goBack()">← 返回</button>
+                <h1>数据报表</h1>
+            </div>
+            
+            <div id="reportsContent">
+                <div class="stats-overview">
+                    <div class="stat-card">
+                        <div class="stat-value" id="reportTotalUsers">0</div>
+                        <div class="stat-label">总用户数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="reportTotalProviders">0</div>
+                        <div class="stat-label">服务商数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="reportTotalServices">0</div>
+                        <div class="stat-label">服务数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="reportTotalAppointments">0</div>
+                        <div class="stat-label">预约数</div>
+                    </div>
+                    <div class="stat-card accent">
+                        <div class="stat-value" id="reportTotalRevenue">¥0</div>
+                        <div class="stat-label">总收入</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="reportTotalCoupons">0</div>
+                        <div class="stat-label">优惠券数</div>
+                    </div>
+                </div>
+
+                <div class="reports-grid">
+                    <div class="report-panel">
+                        <h3>近7日趋势</h3>
+                        <div class="trend-chart" id="trendChart">
+                            <div class="chart-bars">
+                                <div class="chart-bar-group" id="trendBars"></div>
+                            </div>
+                            <div class="chart-labels" id="trendLabels"></div>
+                        </div>
+                    </div>
+
+                    <div class="report-panel">
+                        <h3>分类统计</h3>
+                        <div class="category-list" id="categoryList"></div>
+                    </div>
+
+                    <div class="report-panel">
+                        <h3>服务商排行</h3>
+                        <div class="provider-ranking" id="providerRanking"></div>
+                    </div>
+
+                    <div class="report-panel">
+                        <h3>预约状态分布</h3>
+                        <div class="status-distribution" id="statusDistribution"></div>
+                    </div>
+
+                    <div class="report-panel">
+                        <h3>优惠券统计</h3>
+                        <div class="coupon-stats" id="couponStats"></div>
+                    </div>
+                </div>
             </div>
         </section>
     </main>

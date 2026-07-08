@@ -179,10 +179,6 @@ function navigate(page, data) {
     const pageEl = document.getElementById('page-' + page);
     if (pageEl) pageEl.classList.add('active');
 
-    // Show/hide landing page
-    const homePage = document.getElementById('page-home');
-    if (homePage) homePage.classList.toggle('active', page === 'home');
-
     window.scrollTo(0, 0);
 
     switch(page) {
@@ -196,6 +192,7 @@ function navigate(page, data) {
         case 'profile': loadProfile(); break;
         case 'coupons': loadUserCoupons(); break;
         case 'providerDashboard': loadProviderDashboard(); break;
+        case 'reports': loadReports(); break;
     }
 }
 
@@ -1261,6 +1258,149 @@ function loadUserCoupons() {
             container.innerHTML = '<div class="empty-state"><div class="empty-icon">🎫</div><h3>暂无优惠券</h3><p>快去领取优惠券吧！</p></div>';
         }
     });
+}
+
+function loadReports() {
+    const container = document.getElementById('reportsContent');
+    if (!container) return;
+    container.innerHTML = '<div class="loading">加载中</div>';
+
+    Promise.all([
+        api('/api/stats'),
+        api('/api/stats/daily'),
+        api('/api/stats/categories'),
+        api('/api/stats/providers'),
+        api('/api/stats/appointments'),
+        api('/api/stats/coupons')
+    ]).then(([statsRes, dailyRes, categoriesRes, providersRes, appointmentsRes, couponsRes]) => {
+        renderStatsOverview(statsRes.data, couponsRes.data);
+        renderTrendChart(dailyRes.data);
+        renderCategoryList(categoriesRes.data);
+        renderProviderRanking(providersRes.data);
+        renderStatusDistribution(appointmentsRes.data);
+        renderCouponStats(couponsRes.data);
+        container.style.opacity = '1';
+    }).catch(err => {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><h3>加载失败</h3><p>请稍后重试</p></div>';
+    });
+}
+
+function renderStatsOverview(stats, couponStats) {
+    $('reportTotalUsers').textContent = stats.total_users || 0;
+    $('reportTotalProviders').textContent = stats.total_providers || 0;
+    $('reportTotalServices').textContent = stats.total_services || 0;
+    $('reportTotalAppointments').textContent = stats.total_appointments || 0;
+    $('reportTotalRevenue').textContent = '¥' + (stats.total_revenue || 0).toFixed(2);
+    $('reportTotalCoupons').textContent = couponStats.total_coupons || 0;
+}
+
+function renderTrendChart(dailyData) {
+    const barsContainer = $('trendBars');
+    const labelsContainer = $('trendLabels');
+    if (!barsContainer || !labelsContainer) return;
+
+    const maxAppointments = Math.max(...dailyData.map(d => d.new_appointments || 0), 1);
+    
+    barsContainer.innerHTML = dailyData.map(d => {
+        const height = ((d.new_appointments || 0) / maxAppointments) * 100;
+        return `<div style="display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;"><div class="chart-bar" style="height:${Math.max(height, 5)}%;"></div></div>`;
+    }).join('');
+
+    labelsContainer.innerHTML = dailyData.map(d => {
+        const date = d.date ? d.date.slice(5) : '';
+        return `<div class="chart-label">${date}</div>`;
+    }).join('');
+}
+
+function renderCategoryList(categories) {
+    const container = $('categoryList');
+    if (!container) return;
+
+    if (!categories || categories.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding:20px;"><p>暂无分类数据</p></div>';
+        return;
+    }
+
+    const colors = ['var(--blue)', 'var(--green)', 'var(--orange)', 'var(--purple)', 'var(--pink)', 'var(--red)'];
+    
+    container.innerHTML = categories.map((c, i) => `
+        <div class="category-item">
+            <div class="category-color" style="background:${colors[i % colors.length]};"></div>
+            <div class="category-info">
+                <h4>${escHtml(c.category)}</h4>
+                <p>${c.service_count}个服务 · ${c.appointment_count}次预约</p>
+            </div>
+            <div class="category-revenue">¥${(c.revenue || 0).toFixed(0)}</div>
+        </div>
+    `).join('');
+}
+
+function renderProviderRanking(providers) {
+    const container = $('providerRanking');
+    if (!container) return;
+
+    if (!providers || providers.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding:20px;"><p>暂无服务商数据</p></div>';
+        return;
+    }
+
+    container.innerHTML = providers.map((p, i) => `
+        <div class="provider-rank-item">
+            <div class="rank-badge ${i < 3 ? 'top3' : ''}">${i + 1}</div>
+            <div class="provider-rank-info">
+                <h4>${escHtml(p.provider_name)}</h4>
+                <p>${p.service_count}个服务 · ${p.appointment_count}次预约</p>
+            </div>
+            <div class="provider-rank-revenue">¥${(p.revenue || 0).toFixed(0)}</div>
+        </div>
+    `).join('');
+}
+
+function renderStatusDistribution(statusData) {
+    const container = $('statusDistribution');
+    if (!container) return;
+
+    if (!statusData || statusData.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding:20px;"><p>暂无预约数据</p></div>';
+        return;
+    }
+
+    const total = statusData.reduce((sum, s) => sum + (s.count || 0), 0);
+    const statusLabels = { 'pending': '待确认', 'confirmed': '已确认', 'completed': '已完成', 'cancelled': '已取消' };
+
+    container.innerHTML = statusData.map(s => `
+        <div class="status-item">
+            <span class="status-label">${statusLabels[s.status] || s.status}</span>
+            <div class="status-bar-bg">
+                <div class="status-bar-fill ${s.status}" style="width:${total > 0 ? (s.count / total * 100) : 0}%;"></div>
+            </div>
+            <span class="status-count">${s.count}</span>
+        </div>
+    `).join('');
+}
+
+function renderCouponStats(couponStats) {
+    const container = $('couponStats');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="coupon-stat-item">
+            <div class="stat-value">${couponStats.total_coupons || 0}</div>
+            <div class="stat-label">优惠券总数</div>
+        </div>
+        <div class="coupon-stat-item">
+            <div class="stat-value">${couponStats.total_issued || 0}</div>
+            <div class="stat-label">已发放</div>
+        </div>
+        <div class="coupon-stat-item">
+            <div class="stat-value">${couponStats.total_used || 0}</div>
+            <div class="stat-label">已使用</div>
+        </div>
+        <div class="coupon-stat-item">
+            <div class="stat-value">¥${(couponStats.total_discount || 0).toFixed(0)}</div>
+            <div class="stat-label">优惠金额</div>
+        </div>
+    `;
 }
 
 function claimCoupon(couponId) {

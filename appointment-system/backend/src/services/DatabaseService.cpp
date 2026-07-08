@@ -40,7 +40,22 @@ bool DatabaseService::executeSQL(const std::string& sql) {
     return true;
 }
 
+bool DatabaseService::migrateDatabase() {
+    char* errMsg = nullptr;
+    
+    sqlite3_exec(db_, "ALTER TABLE providers ADD COLUMN IF NOT EXISTS audit_status TEXT DEFAULT 'pending';", nullptr, nullptr, &errMsg);
+    sqlite3_exec(db_, "ALTER TABLE providers ADD COLUMN IF NOT EXISTS audit_comment TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
+    sqlite3_exec(db_, "ALTER TABLE providers ADD COLUMN IF NOT EXISTS license_number TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
+    sqlite3_exec(db_, "ALTER TABLE providers ADD COLUMN IF NOT EXISTS license_image TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
+    
+    sqlite3_exec(db_, "ALTER TABLE services ADD COLUMN IF NOT EXISTS image TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
+    
+    return true;
+}
+
 bool DatabaseService::createTables() {
+    migrateDatabase();
+    
     const char* sql = R"(
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -146,13 +161,29 @@ bool DatabaseService::createTables() {
         CREATE INDEX IF NOT EXISTS idx_appointments_user ON appointments(user_id);
         CREATE INDEX IF NOT EXISTS idx_appointments_provider ON appointments(provider_id);
         CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
+        CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
+        CREATE INDEX IF NOT EXISTS idx_appointments_service ON appointments(service_id);
+        CREATE INDEX IF NOT EXISTS idx_appointments_service_date ON appointments(service_id, appointment_date);
         CREATE INDEX IF NOT EXISTS idx_services_provider ON services(provider_id);
         CREATE INDEX IF NOT EXISTS idx_services_category ON services(category);
+        CREATE INDEX IF NOT EXISTS idx_services_price ON services(price);
+        CREATE INDEX IF NOT EXISTS idx_services_provider_category ON services(provider_id, category);
         CREATE INDEX IF NOT EXISTS idx_reviews_service ON reviews(service_id);
+        CREATE INDEX IF NOT EXISTS idx_reviews_provider ON reviews(provider_id);
         CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+        CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
         CREATE INDEX IF NOT EXISTS idx_coupons_provider ON coupons(provider_id);
+        CREATE INDEX IF NOT EXISTS idx_coupons_status ON coupons(status);
+        CREATE INDEX IF NOT EXISTS idx_coupons_time ON coupons(start_time, end_time);
         CREATE INDEX IF NOT EXISTS idx_user_coupons_user ON user_coupons(user_id);
         CREATE INDEX IF NOT EXISTS idx_user_coupons_provider ON user_coupons(provider_id);
+        CREATE INDEX IF NOT EXISTS idx_user_coupons_coupon ON user_coupons(coupon_id);
+        CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+        CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+        CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+        CREATE INDEX IF NOT EXISTS idx_providers_user ON providers(user_id);
+        CREATE INDEX IF NOT EXISTS idx_providers_category ON providers(category);
+        CREATE INDEX IF NOT EXISTS idx_providers_audit ON providers(audit_status);
     )";
     return executeSQL(sql);
 }
@@ -969,6 +1000,187 @@ models::Stats DatabaseService::getStats() {
         if (sqlite3_step(stmt) == SQLITE_ROW) stats.total_revenue = sqlite3_column_double(stmt, 0);
         sqlite3_finalize(stmt);
     }
+    
+    return stats;
+}
+
+std::vector<models::DailyStats> DatabaseService::getDailyStats(const std::string& startDate, const std::string& endDate) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::DailyStats> result;
+    
+    const char* sql = R"(
+        SELECT 
+            DATE(a.created_at) as date,
+            COUNT(DISTINCT u.id) as new_users,
+            COUNT(DISTINCT p.id) as new_providers,
+            COUNT(DISTINCT s.id) as new_services,
+            COUNT(a.id) as new_appointments,
+            COALESCE(SUM(srv.price), 0) as revenue
+        FROM (SELECT DATE('now', '-6 days') as dt UNION ALL SELECT DATE('now', '-5 days') UNION ALL
+              SELECT DATE('now', '-4 days') UNION ALL SELECT DATE('now', '-3 days') UNION ALL
+              SELECT DATE('now', '-2 days') UNION ALL SELECT DATE('now', '-1 days') UNION ALL
+              SELECT DATE('now')) as dates
+        LEFT JOIN appointments a ON DATE(a.created_at) = dates.dt AND a.status = 'completed'
+        LEFT JOIN users u ON DATE(u.created_at) = dates.dt AND u.role = 'user'
+        LEFT JOIN providers p ON DATE(p.created_at) = dates.dt AND p.status = 'active'
+        LEFT JOIN services s ON DATE(s.created_at) = dates.dt AND s.status = 'active'
+        LEFT JOIN services srv ON a.service_id = srv.id
+        GROUP BY dates.dt
+        ORDER BY dates.dt ASC;
+    )";
+    
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            models::DailyStats ds;
+            ds.date = sqlite3_column_text(stmt, 0) ? (const char*)sqlite3_column_text(stmt, 0) : "";
+            ds.new_users = sqlite3_column_int(stmt, 1);
+            ds.new_providers = sqlite3_column_int(stmt, 2);
+            ds.new_services = sqlite3_column_int(stmt, 3);
+            ds.new_appointments = sqlite3_column_int(stmt, 4);
+            ds.revenue = sqlite3_column_double(stmt, 5);
+            result.push_back(ds);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return result;
+}
+
+std::vector<models::CategoryStats> DatabaseService::getCategoryStats() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::CategoryStats> result;
+    
+    const char* sql = R"(
+        SELECT 
+            s.category,
+            COUNT(DISTINCT s.id) as service_count,
+            COUNT(a.id) as appointment_count,
+            COALESCE(SUM(s.price), 0) as revenue,
+            COALESCE(AVG(r.rating), 0) as avg_rating
+        FROM services s
+        LEFT JOIN appointments a ON s.id = a.service_id AND a.status = 'completed'
+        LEFT JOIN reviews r ON s.id = r.service_id
+        WHERE s.status = 'active' AND s.category != ''
+        GROUP BY s.category
+        ORDER BY appointment_count DESC;
+    )";
+    
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            models::CategoryStats cs;
+            cs.category = sqlite3_column_text(stmt, 0) ? (const char*)sqlite3_column_text(stmt, 0) : "";
+            cs.service_count = sqlite3_column_int(stmt, 1);
+            cs.appointment_count = sqlite3_column_int(stmt, 2);
+            cs.revenue = sqlite3_column_double(stmt, 3);
+            cs.avg_rating = sqlite3_column_double(stmt, 4);
+            result.push_back(cs);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return result;
+}
+
+std::vector<models::ProviderStats> DatabaseService::getProviderStats() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::ProviderStats> result;
+    
+    const char* sql = R"(
+        SELECT 
+            p.id as provider_id,
+            p.name as provider_name,
+            COUNT(DISTINCT s.id) as service_count,
+            COUNT(a.id) as appointment_count,
+            COALESCE(SUM(s.price), 0) as revenue,
+            COALESCE(AVG(r.rating), 0) as avg_rating
+        FROM providers p
+        LEFT JOIN services s ON p.id = s.provider_id AND s.status = 'active'
+        LEFT JOIN appointments a ON p.id = a.provider_id AND a.status = 'completed'
+        LEFT JOIN reviews r ON p.id = r.provider_id
+        WHERE p.status = 'active' AND p.audit_status = 'approved'
+        GROUP BY p.id, p.name
+        ORDER BY revenue DESC
+        LIMIT 10;
+    )";
+    
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            models::ProviderStats ps;
+            ps.provider_id = sqlite3_column_int(stmt, 0);
+            ps.provider_name = sqlite3_column_text(stmt, 1) ? (const char*)sqlite3_column_text(stmt, 1) : "";
+            ps.service_count = sqlite3_column_int(stmt, 2);
+            ps.appointment_count = sqlite3_column_int(stmt, 3);
+            ps.revenue = sqlite3_column_double(stmt, 4);
+            ps.avg_rating = sqlite3_column_double(stmt, 5);
+            result.push_back(ps);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return result;
+}
+
+std::vector<models::AppointmentStats> DatabaseService::getAppointmentStatusStats() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::AppointmentStats> result;
+    
+    const char* sqlTotal = "SELECT COUNT(*) FROM appointments;";
+    sqlite3_stmt* stmt;
+    int total = 0;
+    if (sqlite3_prepare_v2(db_, sqlTotal, -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW) total = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+    }
+    
+    const char* sql = "SELECT status, COUNT(*) as count FROM appointments GROUP BY status;";
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            models::AppointmentStats as;
+            as.status = sqlite3_column_text(stmt, 0) ? (const char*)sqlite3_column_text(stmt, 0) : "";
+            as.count = sqlite3_column_int(stmt, 1);
+            as.percentage = total > 0 ? (as.count * 100.0 / total) : 0;
+            result.push_back(as);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return result;
+}
+
+models::CouponStats DatabaseService::getCouponStats() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    models::CouponStats stats{};
+    
+    const char* sql = R"(
+        SELECT 
+            COUNT(c.id) as total_coupons,
+            COUNT(uc.id) as total_issued,
+            SUM(CASE WHEN uc.status = 'used' THEN 1 ELSE 0 END) as total_used,
+            COALESCE(SUM(CASE WHEN uc.status = 'used' THEN c.discount_amount ELSE 0 END), 0) as total_discount
+        FROM coupons c
+        LEFT JOIN user_coupons uc ON c.id = uc.coupon_id;
+    )";
+    
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            stats.total_coupons = sqlite3_column_int(stmt, 0);
+            stats.total_issued = sqlite3_column_int(stmt, 1);
+            stats.total_used = sqlite3_column_int(stmt, 2);
+            stats.total_discount = sqlite3_column_double(stmt, 3);
+        }
+        sqlite3_finalize(stmt);
+    }
+    return stats;
+}
+
+models::TrendStats DatabaseService::getTrendStats(const std::string& startDate, const std::string& endDate) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    models::TrendStats stats;
+    
+    stats.daily = getDailyStats(startDate, endDate);
+    stats.categories = getCategoryStats();
+    stats.providers = getProviderStats();
+    stats.appointment_status = getAppointmentStatusStats();
     
     return stats;
 }
