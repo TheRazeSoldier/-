@@ -188,7 +188,30 @@
                     <span class="section-badge reveal">热门服务</span>
                     <h2 class="section-title reveal">覆盖全行业，满足各类需求</h2>
                     <div class="services-grid" id="featuredServices">
-                        <div class="loading">加载中</div>
+                        <div class="service-card reveal" onclick="navigate('services');setTimeout(function(){var e=document.getElementById('serviceCategoryFilter');if(e){e.value='医疗';loadServices()}},100)">
+                            <div class="service-card-image medical"><span class="icon-text" style="font-size:2rem;">🏥</span></div>
+                            <div class="service-card-body"><h3>医疗</h3><p class="service-desc">口腔、眼科、中医等专业医疗服务</p></div>
+                        </div>
+                        <div class="service-card reveal" onclick="navigate('services');setTimeout(function(){var e=document.getElementById('serviceCategoryFilter');if(e){e.value='美容';loadServices()}},100)">
+                            <div class="service-card-image beauty"><span class="icon-text" style="font-size:2rem;">💄</span></div>
+                            <div class="service-card-body"><h3>美容</h3><p class="service-desc">美发、美甲、SPA等美容护理服务</p></div>
+                        </div>
+                        <div class="service-card reveal" onclick="navigate('services');setTimeout(function(){var e=document.getElementById('serviceCategoryFilter');if(e){e.value='健身';loadServices()}},100)">
+                            <div class="service-card-image fitness"><span class="icon-text" style="font-size:2rem;">💪</span></div>
+                            <div class="service-card-body"><h3>健身</h3><p class="service-desc">私教、瑜伽、舞蹈等健身训练</p></div>
+                        </div>
+                        <div class="service-card reveal" onclick="navigate('services');setTimeout(function(){var e=document.getElementById('serviceCategoryFilter');if(e){e.value='教育';loadServices()}},100)">
+                            <div class="service-card-image education"><span class="icon-text" style="font-size:2rem;">📚</span></div>
+                            <div class="service-card-body"><h3>教育</h3><p class="service-desc">培训、辅导、才艺等教育课程</p></div>
+                        </div>
+                        <div class="service-card reveal" onclick="navigate('services');setTimeout(function(){var e=document.getElementById('serviceCategoryFilter');if(e){e.value='家政';loadServices()}},100)">
+                            <div class="service-card-image household"><span class="icon-text" style="font-size:2rem;">🏠</span></div>
+                            <div class="service-card-body"><h3>家政</h3><p class="service-desc">保洁、月嫂、家电维修等家政服务</p></div>
+                        </div>
+                        <div class="service-card reveal" onclick="navigate('services');setTimeout(function(){var e=document.getElementById('serviceCategoryFilter');if(e){e.value='法律';loadServices()}},100)">
+                            <div class="service-card-image legal"><span class="icon-text" style="font-size:2rem;">⚖️</span></div>
+                            <div class="service-card-body"><h3>法律</h3><p class="service-desc">咨询、代理、文书等法律服务</p></div>
+                        </div>
                     </div>
                     <div class="section-more reveal">
                         <button class="btn btn-outline" onclick="navigate('services')">浏览全部服务 →</button>

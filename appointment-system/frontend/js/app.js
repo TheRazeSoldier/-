@@ -1081,7 +1081,7 @@ async function loadProviderDashboard() {
         currentProvider = profile.provider;
         const p = profile.provider;
         const { data: apptArr } = await api('/api/appointments/my');
-        const appointments = Array.isArray(apptArr) ? apptArr : [];
+        const appointments = apptArr && apptArr.appointments ? apptArr.appointments : (Array.isArray(apptArr) ? apptArr : []);
         const pending = appointments.filter(a => a.status === 'pending').length;
         const confirmed = appointments.filter(a => a.status === 'confirmed').length;
         const completed = appointments.filter(a => a.status === 'completed').length;
