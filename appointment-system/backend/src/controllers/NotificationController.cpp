@@ -27,11 +27,12 @@ void NotificationController::registerRoutes(httplib::Server& svr) {
         res.set_content(json{{"notifications", result}, {"unread_count", db.getUnreadNotificationCount(authUser.userId)}}.dump(), "application/json");
     });
 
-    svr.Put("/api/notifications/:id/read", [](const httplib::Request& req, httplib::Response& res) {
+    svr.Put(R"(/api/notifications/(\d+)/read)", [](const httplib::Request& req, httplib::Response& res) {
+        if (req.matches.size() < 2) { res.status = 404; return; }
         AuthUser authUser;
         if (!AuthMiddleware::requireAuth(req, res, authUser)) return;
         
-        int id = std::stoi(req.get_param_value("id"));
+        int id = std::stoi(req.matches[1]);
         auto& db = DatabaseService::getInstance();
         
         if (db.markNotificationRead(id)) {

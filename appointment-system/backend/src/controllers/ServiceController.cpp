@@ -79,8 +79,9 @@ void ServiceController::registerRoutes(httplib::Server& svr) {
         res.set_content(result.dump(), "application/json");
     });
 
-    svr.Get("/api/services/:id", [](const httplib::Request& req, httplib::Response& res) {
-        int id = std::stoi(req.get_param_value("id"));
+    svr.Get(R"(/api/services/(\d+))", [](const httplib::Request& req, httplib::Response& res) {
+        if (req.matches.size() < 2) { res.status = 404; return; }
+        int id = std::stoi(req.matches[1]);
         auto& db = DatabaseService::getInstance();
         auto service = db.getServiceById(id);
         
@@ -157,11 +158,12 @@ void ServiceController::registerRoutes(httplib::Server& svr) {
         }
     });
 
-    svr.Put("/api/services/:id", [](const httplib::Request& req, httplib::Response& res) {
+    svr.Put(R"(/api/services/(\d+))", [](const httplib::Request& req, httplib::Response& res) {
+        if (req.matches.size() < 2) { res.status = 404; return; }
         AuthUser authUser;
         if (!AuthMiddleware::requireRole(req, res, authUser, "provider")) return;
         
-        int id = std::stoi(req.get_param_value("id"));
+        int id = std::stoi(req.matches[1]);
         auto body = json::parse(req.body);
         auto& db = DatabaseService::getInstance();
         
@@ -181,11 +183,12 @@ void ServiceController::registerRoutes(httplib::Server& svr) {
         }
     });
 
-    svr.Delete("/api/services/:id", [](const httplib::Request& req, httplib::Response& res) {
+    svr.Delete(R"(/api/services/(\d+))", [](const httplib::Request& req, httplib::Response& res) {
+        if (req.matches.size() < 2) { res.status = 404; return; }
         AuthUser authUser;
         if (!AuthMiddleware::requireRole(req, res, authUser, "provider")) return;
         
-        int id = std::stoi(req.get_param_value("id"));
+        int id = std::stoi(req.matches[1]);
         auto& db = DatabaseService::getInstance();
         
         if (db.deleteService(id)) {

@@ -71,8 +71,9 @@ void CouponController::registerRoutes(httplib::Server& svr) {
         res.set_content(result.dump(), "application/json");
     });
 
-    svr.Get("/api/coupons/available/:providerId", [](const httplib::Request& req, httplib::Response& res) {
-        int providerId = std::stoi(req.get_param_value("providerId"));
+    svr.Get(R"(/api/coupons/available/(\d+))", [](const httplib::Request& req, httplib::Response& res) {
+        if (req.matches.size() < 2) { res.status = 404; return; }
+        int providerId = std::stoi(req.matches[1]);
         auto& db = DatabaseService::getInstance();
         
         auto coupons = db.getAvailableCoupons(providerId);
@@ -92,11 +93,12 @@ void CouponController::registerRoutes(httplib::Server& svr) {
         res.set_content(result.dump(), "application/json");
     });
 
-    svr.Post("/api/coupons/:id/claim", [](const httplib::Request& req, httplib::Response& res) {
+    svr.Post(R"(/api/coupons/(\d+)/claim)", [](const httplib::Request& req, httplib::Response& res) {
+        if (req.matches.size() < 2) { res.status = 404; return; }
         AuthUser authUser;
         if (!AuthMiddleware::requireAuth(req, res, authUser)) return;
         
-        int couponId = std::stoi(req.get_param_value("id"));
+        int couponId = std::stoi(req.matches[1]);
         auto& db = DatabaseService::getInstance();
         
         auto coupon = db.getCouponById(couponId);
@@ -160,11 +162,12 @@ void CouponController::registerRoutes(httplib::Server& svr) {
         res.set_content(result.dump(), "application/json");
     });
 
-    svr.Post("/api/coupons/user/:id/use", [](const httplib::Request& req, httplib::Response& res) {
+    svr.Post(R"(/api/coupons/user/(\d+)/use)", [](const httplib::Request& req, httplib::Response& res) {
+        if (req.matches.size() < 2) { res.status = 404; return; }
         AuthUser authUser;
         if (!AuthMiddleware::requireAuth(req, res, authUser)) return;
         
-        int userCouponId = std::stoi(req.get_param_value("id"));
+        int userCouponId = std::stoi(req.matches[1]);
         auto& db = DatabaseService::getInstance();
         
         if (db.useCoupon(userCouponId)) {
@@ -175,11 +178,12 @@ void CouponController::registerRoutes(httplib::Server& svr) {
         }
     });
 
-    svr.Put("/api/coupons/:id", [](const httplib::Request& req, httplib::Response& res) {
+    svr.Put(R"(/api/coupons/(\d+))", [](const httplib::Request& req, httplib::Response& res) {
+        if (req.matches.size() < 2) { res.status = 404; return; }
         AuthUser authUser;
         if (!AuthMiddleware::requireRole(req, res, authUser, "provider")) return;
         
-        int id = std::stoi(req.get_param_value("id"));
+        int id = std::stoi(req.matches[1]);
         auto body = json::parse(req.body);
         auto& db = DatabaseService::getInstance();
         
@@ -205,11 +209,12 @@ void CouponController::registerRoutes(httplib::Server& svr) {
         }
     });
 
-    svr.Delete("/api/coupons/:id", [](const httplib::Request& req, httplib::Response& res) {
+    svr.Delete(R"(/api/coupons/(\d+))", [](const httplib::Request& req, httplib::Response& res) {
+        if (req.matches.size() < 2) { res.status = 404; return; }
         AuthUser authUser;
         if (!AuthMiddleware::requireRole(req, res, authUser, "provider")) return;
         
-        int id = std::stoi(req.get_param_value("id"));
+        int id = std::stoi(req.matches[1]);
         auto& db = DatabaseService::getInstance();
         
         if (db.deleteCoupon(id)) {

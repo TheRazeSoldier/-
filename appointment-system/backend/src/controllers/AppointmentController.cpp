@@ -78,11 +78,12 @@ void AppointmentController::registerRoutes(httplib::Server& svr) {
         res.set_content(result.dump(), "application/json");
     });
 
-    svr.Get("/api/appointments/:id", [](const httplib::Request& req, httplib::Response& res) {
+    svr.Get(R"(/api/appointments/(\d+))", [](const httplib::Request& req, httplib::Response& res) {
+        if (req.matches.size() < 2) { res.status = 404; return; }
         AuthUser authUser;
         if (!AuthMiddleware::requireAuth(req, res, authUser)) return;
         
-        int id = std::stoi(req.get_param_value("id"));
+        int id = std::stoi(req.matches[1]);
         auto& db = DatabaseService::getInstance();
         auto appt = db.getAppointmentById(id);
         
@@ -111,11 +112,12 @@ void AppointmentController::registerRoutes(httplib::Server& svr) {
         }.dump(), "application/json");
     });
 
-    svr.Put("/api/appointments/:id/status", [](const httplib::Request& req, httplib::Response& res) {
+    svr.Put(R"(/api/appointments/(\d+)/status)", [](const httplib::Request& req, httplib::Response& res) {
+        if (req.matches.size() < 2) { res.status = 404; return; }
         AuthUser authUser;
         if (!AuthMiddleware::requireRole(req, res, authUser, "provider")) return;
         
-        int id = std::stoi(req.get_param_value("id"));
+        int id = std::stoi(req.matches[1]);
         auto body = json::parse(req.body);
         std::string status = body["status"];
         
@@ -143,11 +145,12 @@ void AppointmentController::registerRoutes(httplib::Server& svr) {
         }
     });
 
-    svr.Delete("/api/appointments/:id", [](const httplib::Request& req, httplib::Response& res) {
+    svr.Delete(R"(/api/appointments/(\d+))", [](const httplib::Request& req, httplib::Response& res) {
+        if (req.matches.size() < 2) { res.status = 404; return; }
         AuthUser authUser;
         if (!AuthMiddleware::requireAuth(req, res, authUser)) return;
         
-        int id = std::stoi(req.get_param_value("id"));
+        int id = std::stoi(req.matches[1]);
         auto& db = DatabaseService::getInstance();
         
         if (db.cancelAppointment(id)) {

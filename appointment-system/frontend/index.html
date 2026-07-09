@@ -38,7 +38,9 @@
                         <a href="javascript:void(0)" onclick="navigate('myAppointments')">我的预约</a>
                         <a href="javascript:void(0)" onclick="navigate('coupons')">我的优惠券</a>
                         <a href="javascript:void(0)" onclick="navigate('profile')">个人中心</a>
+                        <a href="javascript:void(0)" id="appLink" onclick="navigate('myApplication')" style="display:none;">服务商申请</a>
                         <a href="javascript:void(0)" id="providerLink" onclick="navigate('providerDashboard')" style="display:none;">服务商管理</a>
+                        <a href="javascript:void(0)" id="adminLink" onclick="navigate('adminDashboard')" style="display:none;">管理后台</a>
                         <a href="javascript:void(0)" onclick="navigate('notifications')">消息通知 <span class="badge" id="notifBadgeMenu">0</span></a>
                         <hr>
                         <a href="javascript:void(0)" onclick="logout()">退出登录</a>
@@ -633,6 +635,30 @@
             </div>
         </section>
 
+        <section id="page-myApplication" class="page">
+            <div class="page-header">
+                <button class="page-back" onclick="goBack()">← 返回</button>
+                <h1>服务商申请</h1>
+            </div>
+            <div id="myApplicationContent">
+                <div class="loading">加载中</div>
+            </div>
+        </section>
+
+        <section id="page-adminDashboard" class="page">
+            <div class="page-header">
+                <button class="page-back" onclick="goBack()">← 返回</button>
+                <h1>管理后台</h1>
+            </div>
+            <div class="dashboard-tabs" style="max-width:900px;margin:0 auto 20px;padding:0 24px;">
+                <button class="dashboard-tab active" onclick="switchAdminTab('applications', this)">服务商审核</button>
+                <button class="dashboard-tab" onclick="switchAdminTab('users', this)">用户管理</button>
+            </div>
+            <div id="adminDashboardContent">
+                <div class="loading">加载中</div>
+            </div>
+        </section>
+
         <section id="page-providerDashboard" class="page">
             <div class="page-header">
                 <button class="page-back" onclick="goBack()">← 返回</button>
@@ -834,6 +860,14 @@
                 <div class="form-error" id="addCouponError"></div>
                 <button type="submit" class="btn btn-primary btn-block">保存优惠券</button>
             </form>
+        </div>
+    </div>
+
+    <div class="modal" id="auditModal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal('auditModal')">&times;</span>
+            <h2>审核服务商申请</h2>
+            <div id="auditModalBody"></div>
         </div>
     </div>
 

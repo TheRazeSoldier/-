@@ -50,6 +50,17 @@ bool DatabaseService::migrateDatabase() {
     
     sqlite3_exec(db_, "ALTER TABLE services ADD COLUMN IF NOT EXISTS image TEXT DEFAULT '';", nullptr, nullptr, &errMsg);
     
+    auto existing = getUserByUsername("admin");
+    if (existing.id == 0) {
+        models::User adminUser;
+        adminUser.username = "admin";
+        adminUser.password = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
+        adminUser.email = "admin@yueyuyue.com";
+        adminUser.phone = "13800000000";
+        adminUser.role = "admin";
+        createUser(adminUser);
+    }
+    
     return true;
 }
 
@@ -290,6 +301,41 @@ bool DatabaseService::updateUser(int id, const models::User& user) {
     bool ok = sqlite3_step(stmt) == SQLITE_DONE;
     sqlite3_finalize(stmt);
     return ok;
+}
+
+bool DatabaseService::updateUserRole(int userId, const std::string& role) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const char* sql = "UPDATE users SET role=? WHERE id=?;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    sqlite3_bind_text(stmt, 1, role.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 2, userId);
+    bool ok = sqlite3_step(stmt) == SQLITE_DONE;
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
+std::vector<models::User> DatabaseService::getUsersByRole(const std::string& role) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::User> users;
+    const char* sql = "SELECT * FROM users WHERE role = ? ORDER BY created_at DESC;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return users;
+    sqlite3_bind_text(stmt, 1, role.c_str(), -1, SQLITE_TRANSIENT);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        models::User u;
+        u.id = sqlite3_column_int(stmt, 0);
+        u.username = (const char*)sqlite3_column_text(stmt, 1);
+        u.password = (const char*)sqlite3_column_text(stmt, 2);
+        u.email = (const char*)sqlite3_column_text(stmt, 3);
+        u.phone = sqlite3_column_text(stmt, 4) ? (const char*)sqlite3_column_text(stmt, 4) : "";
+        u.role = sqlite3_column_text(stmt, 5) ? (const char*)sqlite3_column_text(stmt, 5) : "user";
+        u.avatar = sqlite3_column_text(stmt, 6) ? (const char*)sqlite3_column_text(stmt, 6) : "";
+        u.created_at = sqlite3_column_text(stmt, 7) ? (const char*)sqlite3_column_text(stmt, 7) : "";
+        users.push_back(u);
+    }
+    sqlite3_finalize(stmt);
+    return users;
 }
 
 std::vector<models::User> DatabaseService::getAllUsers() {
@@ -1198,6 +1244,63 @@ bool DatabaseService::auditProvider(int id, const std::string& auditStatus, cons
     bool ok = sqlite3_step(stmt) == SQLITE_DONE;
     sqlite3_finalize(stmt);
     return ok;
+}
+
+std::vector<models::Provider> DatabaseService::getProvidersByUserId(int userId) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::Provider> providers;
+    const char* sql = "SELECT * FROM providers WHERE user_id = ? ORDER BY created_at DESC;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return providers;
+    sqlite3_bind_int(stmt, 1, userId);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        models::Provider p;
+        p.id = sqlite3_column_int(stmt, 0);
+        p.user_id = sqlite3_column_int(stmt, 1);
+        p.name = (const char*)sqlite3_column_text(stmt, 2);
+        p.description = sqlite3_column_text(stmt, 3) ? (const char*)sqlite3_column_text(stmt, 3) : "";
+        p.address = sqlite3_column_text(stmt, 4) ? (const char*)sqlite3_column_text(stmt, 4) : "";
+        p.phone = sqlite3_column_text(stmt, 5) ? (const char*)sqlite3_column_text(stmt, 5) : "";
+        p.category = sqlite3_column_text(stmt, 6) ? (const char*)sqlite3_column_text(stmt, 6) : "";
+        p.avatar = sqlite3_column_text(stmt, 7) ? (const char*)sqlite3_column_text(stmt, 7) : "";
+        p.status = sqlite3_column_text(stmt, 8) ? (const char*)sqlite3_column_text(stmt, 8) : "";
+        p.audit_status = sqlite3_column_text(stmt, 9) ? (const char*)sqlite3_column_text(stmt, 9) : "pending";
+        p.audit_comment = sqlite3_column_text(stmt, 10) ? (const char*)sqlite3_column_text(stmt, 10) : "";
+        p.license_number = sqlite3_column_text(stmt, 11) ? (const char*)sqlite3_column_text(stmt, 11) : "";
+        p.license_image = sqlite3_column_text(stmt, 12) ? (const char*)sqlite3_column_text(stmt, 12) : "";
+        p.created_at = sqlite3_column_text(stmt, 13) ? (const char*)sqlite3_column_text(stmt, 13) : "";
+        providers.push_back(p);
+    }
+    sqlite3_finalize(stmt);
+    return providers;
+}
+
+std::vector<models::Provider> DatabaseService::getAllProviderApplications() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<models::Provider> providers;
+    const char* sql = "SELECT * FROM providers ORDER BY created_at DESC;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return providers;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        models::Provider p;
+        p.id = sqlite3_column_int(stmt, 0);
+        p.user_id = sqlite3_column_int(stmt, 1);
+        p.name = (const char*)sqlite3_column_text(stmt, 2);
+        p.description = sqlite3_column_text(stmt, 3) ? (const char*)sqlite3_column_text(stmt, 3) : "";
+        p.address = sqlite3_column_text(stmt, 4) ? (const char*)sqlite3_column_text(stmt, 4) : "";
+        p.phone = sqlite3_column_text(stmt, 5) ? (const char*)sqlite3_column_text(stmt, 5) : "";
+        p.category = sqlite3_column_text(stmt, 6) ? (const char*)sqlite3_column_text(stmt, 6) : "";
+        p.avatar = sqlite3_column_text(stmt, 7) ? (const char*)sqlite3_column_text(stmt, 7) : "";
+        p.status = sqlite3_column_text(stmt, 8) ? (const char*)sqlite3_column_text(stmt, 8) : "";
+        p.audit_status = sqlite3_column_text(stmt, 9) ? (const char*)sqlite3_column_text(stmt, 9) : "pending";
+        p.audit_comment = sqlite3_column_text(stmt, 10) ? (const char*)sqlite3_column_text(stmt, 10) : "";
+        p.license_number = sqlite3_column_text(stmt, 11) ? (const char*)sqlite3_column_text(stmt, 11) : "";
+        p.license_image = sqlite3_column_text(stmt, 12) ? (const char*)sqlite3_column_text(stmt, 12) : "";
+        p.created_at = sqlite3_column_text(stmt, 13) ? (const char*)sqlite3_column_text(stmt, 13) : "";
+        providers.push_back(p);
+    }
+    sqlite3_finalize(stmt);
+    return providers;
 }
 
 std::vector<models::Provider> DatabaseService::getProvidersByAuditStatus(const std::string& auditStatus) {

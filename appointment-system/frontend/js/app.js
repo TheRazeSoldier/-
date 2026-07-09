@@ -191,6 +191,8 @@ function navigate(page, data) {
         case 'notifications': loadNotifications(); break;
         case 'profile': loadProfile(); break;
         case 'coupons': loadUserCoupons(); break;
+        case 'myApplication': loadMyApplication(); break;
+        case 'adminDashboard': loadAdminDashboard(); break;
         case 'providerDashboard': loadProviderDashboard(); break;
         case 'reports': loadReports(); break;
     }
@@ -222,6 +224,8 @@ function goBack() {
             case 'notifications': loadNotifications(); break;
             case 'profile': loadProfile(); break;
             case 'coupons': loadUserCoupons(); break;
+            case 'myApplication': loadMyApplication(); break;
+            case 'adminDashboard': loadAdminDashboard(); break;
             case 'providerDashboard': loadProviderDashboard(); break;
         }
     } else {
@@ -253,12 +257,7 @@ function handleRegister(e) {
             closeModal('registerModal');
             updateNavState();
             showToast('注册成功！欢迎加入', 'success');
-            if (resp.user.role === 'provider') {
-                showModal('providerRegisterModal');
-                navigate('providerDashboard');
-            } else {
-                navigate('dashboard');
-            }
+            navigate('dashboard');
         } else {
             errorEl.textContent = resp.error || '注册失败';
         }
@@ -307,6 +306,8 @@ function updateNavState() {
     const userNameDisplay = $('userNameDisplay');
     const userAvatar = $('userAvatar');
     const providerLink = $('providerLink');
+    const adminLink = $('adminLink');
+    const appLink = $('appLink');
     const providerFeatureCard = $('providerFeatureCard');
     
     if (currentUser) {
@@ -314,18 +315,30 @@ function updateNavState() {
         navUser.style.display = 'flex';
         userNameDisplay.textContent = currentUser.username;
         userAvatar.textContent = currentUser.username.charAt(0).toUpperCase();
-        if (currentUser.role === 'provider') {
-            providerLink.style.display = 'block';
+        
+        if (currentUser.role === 'admin') {
+            if (adminLink) adminLink.style.display = 'block';
+            if (providerLink) providerLink.style.display = 'block';
+            if (appLink) appLink.style.display = 'none';
+            if (providerFeatureCard) providerFeatureCard.style.display = 'none';
+        } else if (currentUser.role === 'provider') {
+            if (adminLink) adminLink.style.display = 'none';
+            if (providerLink) providerLink.style.display = 'block';
+            if (appLink) appLink.style.display = 'none';
             if (providerFeatureCard) providerFeatureCard.style.display = 'flex';
         } else {
-            providerLink.style.display = 'none';
+            if (adminLink) adminLink.style.display = 'none';
+            if (providerLink) providerLink.style.display = 'none';
+            if (appLink) appLink.style.display = 'block';
             if (providerFeatureCard) providerFeatureCard.style.display = 'none';
         }
         loadUnreadCount();
     } else {
         navActions.style.display = 'flex';
         navUser.style.display = 'none';
-        providerLink.style.display = 'none';
+        if (providerLink) providerLink.style.display = 'none';
+        if (adminLink) adminLink.style.display = 'none';
+        if (appLink) appLink.style.display = 'none';
         if (providerFeatureCard) providerFeatureCard.style.display = 'none';
     }
 }
@@ -909,6 +922,79 @@ function updateProfile(e) {
     });
 }
 
+// ==================== My Provider Application ====================
+function loadMyApplication() {
+    if (!currentUser) { showToast('请先登录', 'warning'); showModal('loginModal'); return; }
+    const container = $('myApplicationContent');
+    if (!container) return;
+    container.innerHTML = '<div class="loading">加载中</div>';
+    
+    api('/api/providers/my-application').then(({ status, data }) => {
+        if (data.applications && data.applications.length > 0) {
+            const app = data.applications[0];
+            const statusMap = { 'pending': '审核中', 'approved': '已通过', 'rejected': '未通过' };
+            const statusClass = { 'pending': 'status-pending', 'approved': 'status-confirmed', 'rejected': 'status-cancelled' };
+            const badgeMap = { 'pending': '⏳ 审核中', 'approved': '✅ 已通过', 'rejected': '❌ 未通过' };
+            
+            container.innerHTML = `
+                <div class="profile-card">
+                    <div class="profile-header" style="margin-bottom:20px;">
+                        <div class="profile-avatar-lg">${escHtml(app.name.charAt(0))}</div>
+                        <div>
+                            <div class="profile-name">${escHtml(app.name)}</div>
+                            <span class="profile-role">${escHtml(app.category)}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="application-status-card">
+                        <div class="audit-progress">
+                            <div class="audit-step ${app.audit_status === 'pending' || app.audit_status === 'approved' ? 'active' : ''}">
+                                <div class="step-dot">1</div>
+                                <span>已提交</span>
+                            </div>
+                            <div class="step-line ${app.audit_status === 'pending' || app.audit_status === 'approved' ? 'active' : ''}"></div>
+                            <div class="audit-step ${app.audit_status === 'pending' ? 'active' : ''} ${app.audit_status === 'approved' ? 'active' : ''}">
+                                <div class="step-dot">2</div>
+                                <span>审核中</span>
+                            </div>
+                            <div class="step-line ${app.audit_status === 'approved' || app.audit_status === 'rejected' ? 'active' : ''}"></div>
+                            <div class="audit-step ${app.audit_status === 'approved' || app.audit_status === 'rejected' ? 'active' : ''}">
+                                <div class="step-dot ${app.audit_status === 'rejected' ? 'rejected' : ''}">${app.audit_status === 'approved' ? '✓' : app.audit_status === 'rejected' ? '✗' : '3'}</div>
+                                <span>${app.audit_status === 'approved' ? '已通过' : app.audit_status === 'rejected' ? '未通过' : '已审核'}</span>
+                            </div>
+                        </div>
+                        <div class="audit-result" style="text-align:center;margin-top:20px;">
+                            <span class="status-badge ${statusClass[app.audit_status] || 'status-pending'}">${badgeMap[app.audit_status] || '审核中'}</span>
+                            ${app.audit_comment ? `<p style="margin-top:12px;color:var(--mid-gray);">审核意见：${escHtml(app.audit_comment)}</p>` : ''}
+                            ${app.audit_status === 'approved' ? `<p style="margin-top:12px;color:var(--green);">恭喜！您现在可以管理服务和预约了。</p>` : ''}
+                            ${app.audit_status === 'rejected' ? `<p style="margin-top:12px;color:var(--mid-gray);">您可以根据审核意见修改后重新提交申请。</p>` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="profile-card" style="margin-top:20px;">
+                        <h4 style="margin-bottom:12px;">申请信息</h4>
+                        <div class="info-row"><span>服务商名称</span><span>${escHtml(app.name)}</span></div>
+                        <div class="info-row"><span>分类</span><span>${escHtml(app.category)}</span></div>
+                        <div class="info-row"><span>简介</span><span>${escHtml(app.description) || '无'}</span></div>
+                        <div class="info-row"><span>地址</span><span>${escHtml(app.address) || '无'}</span></div>
+                        <div class="info-row"><span>电话</span><span>${escHtml(app.phone) || '无'}</span></div>
+                        <div class="info-row"><span>提交时间</span><span>${formatDateTime(app.created_at)}</span></div>
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <div class="empty-state" style="padding:80px 24px;">
+                    <div class="empty-icon">📋</div>
+                    <h3>尚未提交申请</h3>
+                    <p style="margin-bottom:20px;">提交服务商申请，通过审核后即可发布服务</p>
+                    <button class="btn btn-primary" style="background:var(--orange);" onclick="showModal('providerRegisterModal')">立即申请</button>
+                </div>
+            `;
+        }
+    });
+}
+
 // ==================== Provider Registration ====================
 function handleProviderRegister(e) {
     e.preventDefault();
@@ -917,12 +1003,10 @@ function handleProviderRegister(e) {
     const data = { name: $('provName').value.trim(), category: $('provCategory').value, description: $('provDescription').value.trim(), address: $('provAddress').value.trim(), phone: $('provPhone').value.trim() };
     api('/api/providers', { method: 'POST', body: JSON.stringify(data) }).then(({ status, data: resp }) => {
         if (status === 200) {
-            currentProvider = resp.provider; currentUser.role = 'provider';
-            localStorage.setItem('provider', JSON.stringify(resp.provider));
-            localStorage.setItem('user', JSON.stringify(currentUser));
-            closeModal('providerRegisterModal'); updateNavState();
-            showToast('服务商注册成功！', 'success'); navigate('providerDashboard');
-        } else { errorEl.textContent = resp.error || '注册失败'; }
+            closeModal('providerRegisterModal');
+            showToast('申请已提交，请等待管理员审核', 'success');
+            navigate('myApplication');
+        } else { errorEl.textContent = resp.error || '提交失败'; }
     });
 }
 
@@ -1042,6 +1126,172 @@ function updateProviderInfo(e) {
     api('/api/providers', { method: 'PUT', body: JSON.stringify(data) }).then(({ status, data: resp }) => {
         if (status === 200) { currentProvider = resp.provider; localStorage.setItem('provider', JSON.stringify(resp.provider)); showToast('信息更新成功！', 'success'); }
         else { showToast(resp.error || '更新失败', 'error'); }
+    });
+}
+
+// ==================== Admin Dashboard ====================
+let currentAdminTab = 'applications';
+
+function loadAdminDashboard() {
+    if (!currentUser || currentUser.role !== 'admin') {
+        showToast('无权限访问', 'error');
+        navigate('dashboard');
+        return;
+    }
+    switchAdminTab(currentAdminTab, document.querySelector('.dashboard-tab.active'));
+}
+
+function switchAdminTab(tab, btn) {
+    currentAdminTab = tab;
+    document.querySelectorAll('.dashboard-tab').forEach(t => t.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    
+    const container = $('adminDashboardContent');
+    if (!container) return;
+    container.innerHTML = '<div class="loading">加载中</div>';
+    
+    if (tab === 'applications') {
+        loadAdminApplications();
+    } else if (tab === 'users') {
+        loadAdminUsers();
+    }
+}
+
+function loadAdminApplications() {
+    const container = $('adminDashboardContent');
+    if (!container) return;
+    
+    api('/api/providers/audit/all').then(({ data }) => {
+        if (data && data.length > 0) {
+            const statusMap = { 'pending': '待审核', 'approved': '已通过', 'rejected': '已拒绝' };
+            const statusClass = { 'pending': 'status-pending', 'approved': 'status-confirmed', 'rejected': 'status-cancelled' };
+            
+            container.innerHTML = `
+                <div style="max-width:900px;margin:0 auto;padding:0 24px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                        <h3>服务商入驻申请 (${data.length})</h3>
+                    </div>
+                    <div class="admin-applications-list">
+                        ${data.map(p => `
+                            <div class="appointment-card ${p.audit_status === 'pending' ? 'highlight' : ''}">
+                                <div class="appointment-header">
+                                    <span class="appointment-title">${escHtml(p.name)}</span>
+                                    <span class="status-badge ${statusClass[p.audit_status] || 'status-pending'}">${statusMap[p.audit_status] || p.audit_status}</span>
+                                </div>
+                                <div class="appointment-info">
+                                    <span>👤 申请人: ${escHtml(p.username)}</span>
+                                    <span>📂 ${escHtml(p.category)}</span>
+                                    <span>📅 ${formatDateTime(p.created_at)}</span>
+                                </div>
+                                <p style="color:var(--mid-gray);margin:8px 0;">${escHtml(p.description) || '暂无简介'}</p>
+                                ${p.audit_comment ? `<p style="color:var(--orange);font-size:0.85rem;">审核意见: ${escHtml(p.audit_comment)}</p>` : ''}
+                                <div class="appointment-actions" style="margin-top:12px;">
+                                    <button class="btn btn-outline btn-sm" onclick="viewApplicationDetail(${p.id})">查看详情</button>
+                                    ${p.audit_status === 'pending' ? `
+                                        <button class="btn btn-primary btn-sm" style="background:var(--green);" onclick="approveApplication(${p.id})">通过</button>
+                                        <button class="btn btn-primary btn-sm" style="background:#EF4444;" onclick="rejectApplication(${p.id})">拒绝</button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = '<div class="empty-state" style="padding:80px 24px;"><div class="empty-icon">📋</div><h3>暂无申请</h3><p>暂时没有服务商入驻申请</p></div>';
+        }
+    });
+}
+
+function loadAdminUsers() {
+    const container = $('adminDashboardContent');
+    if (!container) return;
+    
+    api('/api/users').then(({ data }) => {
+        if (data.users && data.users.length > 0) {
+            const roleMap = { 'user': '普通用户', 'provider': '服务商', 'admin': '管理员' };
+            container.innerHTML = `
+                <div style="max-width:900px;margin:0 auto;padding:0 24px;">
+                    <h3 style="margin-bottom:20px;">用户管理 (${data.users.length})</h3>
+                    <div class="admin-users-list">
+                        ${data.users.map(u => `
+                            <div class="appointment-card">
+                                <div class="appointment-header">
+                                    <span class="appointment-title">${escHtml(u.username)}</span>
+                                    <span class="status-badge ${u.role === 'admin' ? 'status-confirmed' : u.role === 'provider' ? 'status-pending' : ''}">${roleMap[u.role] || u.role}</span>
+                                </div>
+                                <div class="appointment-info">
+                                    <span>📧 ${escHtml(u.email)}</span>
+                                    <span>📱 ${u.phone || '未填写'}</span>
+                                    <span>📅 ${formatDateTime(u.created_at)}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = '<div class="empty-state" style="padding:80px 24px;"><div class="empty-icon">👤</div><h3>暂无用户</h3></div>';
+        }
+    });
+}
+
+function viewApplicationDetail(id) {
+    api('/api/providers/' + id).then(({ data }) => {
+        const statusMap = { 'pending': '待审核', 'approved': '已通过', 'rejected': '已拒绝' };
+        const statusClass = { 'pending': 'status-pending', 'approved': 'status-confirmed', 'rejected': 'status-cancelled' };
+        $('auditModalBody').innerHTML = `
+            <div class="profile-card">
+                <div class="profile-header">
+                    <div class="profile-avatar-lg">${escHtml(data.name.charAt(0))}</div>
+                    <div>
+                        <div class="profile-name">${escHtml(data.name)}</div>
+                        <span class="profile-role">${escHtml(data.category)}</span>
+                    </div>
+                </div>
+                <div class="info-row"><span>状态</span><span class="status-badge ${statusClass[data.audit_status]}">${statusMap[data.audit_status]}</span></div>
+                <div class="info-row"><span>简介</span><span>${escHtml(data.description) || '无'}</span></div>
+                <div class="info-row"><span>地址</span><span>${escHtml(data.address) || '无'}</span></div>
+                <div class="info-row"><span>电话</span><span>${escHtml(data.phone) || '无'}</span></div>
+                <div class="info-row"><span>许可证号</span><span>${escHtml(data.license_number) || '无'}</span></div>
+                <div class="info-row"><span>提交时间</span><span>${formatDateTime(data.created_at)}</span></div>
+                ${data.audit_comment ? `<div class="info-row"><span>审核意见</span><span style="color:var(--orange);">${escHtml(data.audit_comment)}</span></div>` : ''}
+            </div>
+            ${data.audit_status === 'pending' ? `
+                <div style="display:flex;gap:12px;margin-top:20px;">
+                    <button class="btn btn-primary" style="flex:1;background:var(--green);" onclick="approveApplication(${data.id})">✅ 通过</button>
+                    <button class="btn btn-primary" style="flex:1;background:#EF4444;" onclick="closeModal('auditModal');rejectApplication(${data.id})">❌ 拒绝</button>
+                </div>
+            ` : ''}
+        `;
+        showModal('auditModal');
+    });
+}
+
+function approveApplication(id) {
+    const comment = prompt('请输入审核意见（可选）：');
+    api('/api/providers/' + id + '/audit', { method: 'POST', body: JSON.stringify({ audit_status: 'approved', audit_comment: comment || '' }) }).then(({ status, data: resp }) => {
+        if (status === 200) {
+            showToast('已通过该申请', 'success');
+            closeModal('auditModal');
+            loadAdminApplications();
+        } else {
+            showToast(resp.error || '操作失败', 'error');
+        }
+    });
+}
+
+function rejectApplication(id) {
+    const comment = prompt('请输入拒绝原因：');
+    if (!comment) { showToast('请填写拒绝原因', 'warning'); return; }
+    api('/api/providers/' + id + '/audit', { method: 'POST', body: JSON.stringify({ audit_status: 'rejected', audit_comment: comment }) }).then(({ status, data: resp }) => {
+        if (status === 200) {
+            showToast('已拒绝该申请', 'info');
+            closeModal('auditModal');
+            loadAdminApplications();
+        } else {
+            showToast(resp.error || '操作失败', 'error');
+        }
     });
 }
 

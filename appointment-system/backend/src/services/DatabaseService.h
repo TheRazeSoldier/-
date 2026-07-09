@@ -15,7 +15,9 @@ public:
     models::User getUserByUsername(const std::string& username);
     models::User getUserByEmail(const std::string& email);
     bool updateUser(int id, const models::User& user);
+    bool updateUserRole(int userId, const std::string& role);
     std::vector<models::User> getAllUsers();
+    std::vector<models::User> getUsersByRole(const std::string& role);
 
     // Providers
     int createProvider(const models::Provider& provider);
@@ -24,6 +26,8 @@ public:
     std::vector<models::Provider> getAllProviders();
     std::vector<models::Provider> getProvidersByCategory(const std::string& category);
     std::vector<models::Provider> getProvidersByAuditStatus(const std::string& auditStatus);
+    std::vector<models::Provider> getProvidersByUserId(int userId);
+    std::vector<models::Provider> getAllProviderApplications();
     bool updateProvider(int id, const models::Provider& provider);
     bool auditProvider(int id, const std::string& auditStatus, const std::string& auditComment);
 
