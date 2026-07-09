@@ -19,7 +19,9 @@ bool DatabaseService::init(const std::string& dbPath) {
     }
     sqlite3_exec(db_, "PRAGMA journal_mode=WAL;", nullptr, nullptr, nullptr);
     sqlite3_exec(db_, "PRAGMA foreign_keys=ON;", nullptr, nullptr, nullptr);
-    return createTables();
+    if (!createTables()) return false;
+    seedDemoData();
+    return true;
 }
 
 void DatabaseService::close() {
@@ -64,9 +66,71 @@ bool DatabaseService::migrateDatabase() {
     return true;
 }
 
+bool DatabaseService::seedDemoData() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    {
+        const char* check = "SELECT COUNT(*) FROM providers;";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(db_, check, -1, &stmt, nullptr) == SQLITE_OK) {
+            if (sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_int(stmt, 0) > 0) {
+                sqlite3_finalize(stmt);
+                return true;
+            }
+            sqlite3_finalize(stmt);
+        }
+    }
+    const char* hash = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
+    executeSQL("INSERT OR IGNORE INTO users (username, password, email, phone, role) VALUES "
+        "('zhangsan',  '" + std::string(hash) + "', 'zhangsan@test.com',  '13800001001', 'provider'),"
+        "('lisi',      '" + std::string(hash) + "', 'lisi@test.com',      '13800001002', 'provider'),"
+        "('wangwu',    '" + std::string(hash) + "', 'wangwu@test.com',    '13800001003', 'provider'),"
+        "('zhaoliu',   '" + std::string(hash) + "', 'zhaoliu@test.com',   '13800001004', 'provider'),"
+        "('sunqi',     '" + std::string(hash) + "', 'sunqi@test.com',     '13800001005', 'provider'),"
+        "('zhouba',    '" + std::string(hash) + "', 'zhouba@test.com',    '13800001006', 'provider'),"
+        "('wujiu',     '" + std::string(hash) + "', 'wujiu@test.com',     '13800001007', 'provider'),"
+        "('zhengshi',  '" + std::string(hash) + "', 'zhengshi@test.com',  '13800001008', 'provider'),"
+        "('chenyi',    '" + std::string(hash) + "', 'chenyi@test.com',    '13800001009', 'provider'),"
+        "('liner',     '" + std::string(hash) + "', 'liner@test.com',     '13800001010', 'provider');");
+    executeSQL("INSERT OR IGNORE INTO providers (user_id, name, description, address, phone, category, audit_status) VALUES "
+        "(2,  '阳光口腔诊所',   '专业口腔护理，洗牙补牙矫正种植一站式服务',   '海淀区中关村大街88号',  '13800001001', '医疗', 'approved'),"
+        "(3,  '美艺人生造型',   '时尚发型设计，烫染护理，专业美发沙龙',           '朝阳区三里屯路12号',   '13800001002', '美容', 'approved'),"
+        "(4,  '康健中医馆',     '传统中医调理，针灸推拿中药理疗',                 '东城区东直门内大街5号', '13800001003', '医疗', 'approved'),"
+        "(5,  '指尖星辰美甲',   '精美美甲美睫，日式韩式款式齐全',                 '西城区西单北大街23号',  '13800001004', '美容', 'approved'),"
+        "(6,  '舒心推拿馆',     '专业中医推拿，缓解疲劳改善体质',                   '朝阳区望京SOHO T2',    '13800001005', '养生', 'approved'),"
+        "(7,  '雅致美容SPA',   '高端美容护肤，面部身体SPA管理',                   '海淀区五道口华联大厦',  '13800001006', '美容', 'approved'),"
+        "(8,  '瑞尔眼科',      '近视矫正，眼科检查配镜',                         '朝阳区建国路88号',     '13800001007', '医疗', 'approved'),"
+        "(9,  '御膳营养坊',    '私人营养配餐，食疗调理健康管理',                 '东城区王府井大街45号',  '13800001008', '养生', 'approved'),"
+        "(10, '匠心牙科',      '隐形矫正，种植牙修复美白',                       '朝阳区朝外大街6号',    '13800001009', '医疗', 'approved'),"
+        "(11, '花间堂皮肤管理','皮肤管理抗衰老祛痘修复',                         '海淀区中关村大街1号',   '13800001010', '美容', 'approved');");
+    executeSQL("INSERT OR IGNORE INTO services (provider_id, name, description, category, price, duration) VALUES "
+        "(1, '超声波洗牙',    '深层清洁去除牙结石',          '口腔', 128, 30),"
+        "(1, '树脂补牙',      '进口材料修复蛀牙',            '口腔', 258, 40),"
+        "(1, '冷光美白',      '半小时快速美白',              '口腔', 398, 30),"
+        "(2, '经典洗剪吹',    '设计师量身打造发型',          '理发',  68, 40),"
+        "(2, '植物染发',      '纯植物配方不伤发',            '染发', 238, 90),"
+        "(2, '烫发护理',      '热烫冷烫多种选择',            '烫发', 368, 120),"
+        "(3, '中医推拿',      '缓解肩颈腰椎不适',            '推拿', 158, 60),"
+        "(3, '拔罐刮痧',      '祛湿排毒疏通经络',            '理疗',  98, 40),"
+        "(3, '中药调理',      '定制中药方调理体质',          '中医', 198, 30),"
+        "(4, '日式美甲',      '百种颜色款式任选',            '美甲',  88, 60),"
+        "(4, '手足护理',      '深层滋润软化角质',            '护理', 128, 45),"
+        "(5, '全身推拿',      '精油开背全身放松',            '推拿', 198, 90),"
+        "(5, '足底按摩',      '精准穴位按压缓解疲劳',        '足疗', 128, 60),"
+        "(6, '面部深层清洁',  '小气泡清洁去黑头',            '面部', 168, 60),"
+        "(6, '玻尿酸导入',    '补水保湿提亮肤色',            '面部', 268, 50),"
+        "(7, '视力检查',      '全面视力检测',                '眼科',  58, 20),"
+        "(7, '框架配镜',      '多品牌镜框可选',              '眼科', 298, 30),"
+        "(8, '营养咨询',      '个人定制健康饮食方案',        '营养',  98, 40),"
+        "(8, '体质调理',      '中医体质辨识与食疗建议',      '健康', 198, 50),"
+        "(9, '隐形矫正初诊',  '3D口扫设计方案',             '口腔',  99, 40),"
+        "(9, '超声波洁牙',    '深层洁牙抛光',                '口腔', 168, 30),"
+        "(10,'清痘护理',      '深层清洁消炎祛痘',            '皮肤', 128, 50),"
+        "(10,'水光导入',      '深层补水亮肤',                '皮肤', 198, 60);");
+    std::cout << "Seed demo data inserted: 10 providers, 23 services." << std::endl;
+    return true;
+}
+
 bool DatabaseService::createTables() {
-    migrateDatabase();
-    
     const char* sql = R"(
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -196,7 +260,7 @@ bool DatabaseService::createTables() {
         CREATE INDEX IF NOT EXISTS idx_providers_category ON providers(category);
         CREATE INDEX IF NOT EXISTS idx_providers_audit ON providers(audit_status);
     )";
-    return executeSQL(sql);
+    return executeSQL(sql) && (migrateDatabase(), true);
 }
 
 int DatabaseService::createUser(const models::User& user) {

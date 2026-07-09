@@ -76,6 +76,9 @@ public:
     bool updateCoupon(int id, const models::Coupon& coupon);
     bool deleteCoupon(int id);
 
+    // Seed
+    bool seedDemoData();
+
     // Stats
     models::Stats getStats();
     models::TrendStats getTrendStats(const std::string& startDate, const std::string& endDate);
