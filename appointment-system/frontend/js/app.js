@@ -1973,28 +1973,17 @@ function useUserCoupon(userCouponId) {
                 '<h4 style="margin-bottom:12px;">选择服务使用此优惠券</h4>' +
                 (svcs.length > 0 ? svcs.map(s => '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--light-gray);">' +
                     '<div><div style="font-weight:600;">' + escHtml(s.name) + '</div><div style="font-size:0.8rem;color:var(--mid-gray);">¥' + (s.price || 0).toFixed(2) + ' · ' + s.duration + '分钟</div></div>' +
-                    '<button class="btn btn-primary btn-sm" onclick="confirmUseCoupon(' + userCouponId + ', this)" style="font-size:0.8rem;">使用</button>' +
+                    '<button class="btn btn-primary btn-sm" onclick="confirmUseCoupon(' + userCouponId + ', ' + s.id + ')" style="font-size:0.8rem;">去预约</button>' +
                 '</div>').join('') : '<p style="color:var(--mid-gray);text-align:center;padding:16px;">该商家暂无可用服务</p>') +
             '</div>';
         }).catch(() => { overlay.remove(); showToast('加载服务失败', 'error'); });
     }).catch(() => { overlay.remove(); showToast('加载优惠券失败', 'error'); });
 }
 
-function confirmUseCoupon(userCouponId, btn) {
-    btn.textContent = '使用中...';
-    btn.disabled = true;
-    api('/api/coupons/user/' + userCouponId + '/use', { method: 'POST' }).then(({ status, data }) => {
-        if (status === 200) {
-            const overlay = btn.closest('div[style]');
-            if (overlay) overlay.remove();
-            showToast('优惠券使用成功！', 'success');
-            loadUserCoupons();
-        } else {
-            btn.textContent = '使用';
-            btn.disabled = false;
-            showToast(data.error || '使用失败', 'error');
-        }
-    });
+function confirmUseCoupon(userCouponId, serviceId) {
+    const overlay = document.querySelector('div[style*="z-index:9999"]');
+    if (overlay) overlay.remove();
+    navigate('serviceDetail', serviceId);
 }
 
 // ==================== Utilities ====================
