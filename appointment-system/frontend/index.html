@@ -538,56 +538,83 @@
         </section>
 
         <section id="page-services" class="page">
-            <div class="page-header">
-                <button class="page-back" onclick="goBack()">← 返回</button>
-                <h1>服务列表</h1>
-                <div class="search-bar">
-                    <input type="text" id="serviceSearch" placeholder="搜索服务..." onkeyup="if(event.key==='Enter') loadServices()">
-                    <select id="serviceCategoryFilter" onchange="loadServices()">
-                        <option value="">全部分类</option>
-                        <option value="医疗">医疗健康</option>
-                        <option value="美容">美容美发</option>
-                        <option value="健身">健身运动</option>
-                        <option value="教育">教育培训</option>
-                        <option value="家政">家政服务</option>
-                        <option value="法律">法律咨询</option>
-                    </select>
-                    <button class="btn btn-primary" onclick="loadServices()">搜索</button>
+            <div class="page-header" style="border:none;padding-bottom:0;">
+                <h1 style="font-size:1.5rem;">服务大厅</h1>
+            </div>
+            
+            <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:16px 0;">
+                <div class="service-card" onclick="navigate('services');setTimeout(function(){var e=document.getElementById('serviceCategoryFilter');if(e){e.value='医疗';loadServices()}},100)" style="cursor:pointer;text-align:center;padding:12px 4px;">
+                    <div class="service-card-image medical" style="height:50px;width:50px;margin:0 auto 6px;border-radius:50%;"><span class="icon-text" style="font-size:1.3rem;">🏥</span></div>
+                    <div class="service-card-body" style="padding:0;"><h3 style="font-size:0.8rem;">医疗</h3></div>
+                </div>
+                <div class="service-card" onclick="navigate('services');setTimeout(function(){var e=document.getElementById('serviceCategoryFilter');if(e){e.value='美容';loadServices()}},100)" style="cursor:pointer;text-align:center;padding:12px 4px;">
+                    <div class="service-card-image beauty" style="height:50px;width:50px;margin:0 auto 6px;border-radius:50%;"><span class="icon-text" style="font-size:1.3rem;">💄</span></div>
+                    <div class="service-card-body" style="padding:0;"><h3 style="font-size:0.8rem;">美容</h3></div>
+                </div>
+                <div class="service-card" onclick="navigate('services');setTimeout(function(){var e=document.getElementById('serviceCategoryFilter');if(e){e.value='健身';loadServices()}},100)" style="cursor:pointer;text-align:center;padding:12px 4px;">
+                    <div class="service-card-image fitness" style="height:50px;width:50px;margin:0 auto 6px;border-radius:50%;"><span class="icon-text" style="font-size:1.3rem;">💪</span></div>
+                    <div class="service-card-body" style="padding:0;"><h3 style="font-size:0.8rem;">健身</h3></div>
+                </div>
+                <div class="service-card" onclick="navigate('services');setTimeout(function(){var e=document.getElementById('serviceCategoryFilter');if(e){e.value='教育';loadServices()}},100)" style="cursor:pointer;text-align:center;padding:12px 4px;">
+                    <div class="service-card-image education" style="height:50px;width:50px;margin:0 auto 6px;border-radius:50%;"><span class="icon-text" style="font-size:1.3rem;">📚</span></div>
+                    <div class="service-card-body" style="padding:0;"><h3 style="font-size:0.8rem;">教育</h3></div>
+                </div>
+                <div class="service-card" onclick="navigate('services');setTimeout(function(){var e=document.getElementById('serviceCategoryFilter');if(e){e.value='家政';loadServices()}},100)" style="cursor:pointer;text-align:center;padding:12px 4px;">
+                    <div class="service-card-image household" style="height:50px;width:50px;margin:0 auto 6px;border-radius:50%;"><span class="icon-text" style="font-size:1.3rem;">🏠</span></div>
+                    <div class="service-card-body" style="padding:0;"><h3 style="font-size:0.8rem;">家政</h3></div>
+                </div>
+                <div class="service-card" onclick="navigate('services');setTimeout(function(){var e=document.getElementById('serviceCategoryFilter');if(e){e.value='法律';loadServices()}},100)" style="cursor:pointer;text-align:center;padding:12px 4px;">
+                    <div class="service-card-image legal" style="height:50px;width:50px;margin:0 auto 6px;border-radius:50%;"><span class="icon-text" style="font-size:1.3rem;">⚖️</span></div>
+                    <div class="service-card-body" style="padding:0;"><h3 style="font-size:0.8rem;">法律</h3></div>
                 </div>
             </div>
             
-            <div class="filters-bar">
-                <div class="filter-group">
-                    <label>价格区间</label>
-                    <div class="filter-inputs">
-                        <input type="number" id="priceMin" placeholder="最低" min="0" onchange="loadServices()">
-                        <span>-</span>
-                        <input type="number" id="priceMax" placeholder="最高" min="0" onchange="loadServices()">
+            <div class="search-bar" style="margin-bottom:12px;">
+                <input type="text" id="serviceSearch" placeholder="搜索服务..." onkeyup="if(event.key==='Enter') loadServices()">
+                <select id="serviceCategoryFilter" onchange="loadServices()" style="display:none;">
+                    <option value="">全部分类</option>
+                    <option value="医疗">医疗健康</option>
+                    <option value="美容">美容美发</option>
+                    <option value="健身">健身运动</option>
+                    <option value="教育">教育培训</option>
+                    <option value="家政">家政服务</option>
+                    <option value="法律">法律咨询</option>
+                </select>
+                <button class="btn btn-primary" onclick="loadServices()">搜索</button>
+            </div>
+            
+            <div class="filters-bar" style="padding:8px 0;flex-wrap:wrap;gap:8px;">
+                <div class="filter-group" style="flex:1;min-width:140px;">
+                    <label style="font-size:0.8rem;">价格</label>
+                    <div class="filter-inputs" style="gap:4px;">
+                        <input type="number" id="priceMin" placeholder="最低" min="0" onchange="loadServices()" style="width:60px;padding:4px 6px;">
+                        <span style="font-size:0.8rem;">-</span>
+                        <input type="number" id="priceMax" placeholder="最高" min="0" onchange="loadServices()" style="width:60px;padding:4px 6px;">
                     </div>
                 </div>
-                <div class="filter-group">
-                    <label>时长(分钟)</label>
-                    <div class="filter-inputs">
-                        <input type="number" id="durationMin" placeholder="最短" min="0" onchange="loadServices()">
-                        <span>-</span>
-                        <input type="number" id="durationMax" placeholder="最长" min="0" onchange="loadServices()">
+                <div class="filter-group" style="flex:1;min-width:140px;">
+                    <label style="font-size:0.8rem;">时长</label>
+                    <div class="filter-inputs" style="gap:4px;">
+                        <input type="number" id="durationMin" placeholder="最短" min="0" onchange="loadServices()" style="width:60px;padding:4px 6px;">
+                        <span style="font-size:0.8rem;">-</span>
+                        <input type="number" id="durationMax" placeholder="最长" min="0" onchange="loadServices()" style="width:60px;padding:4px 6px;">
                     </div>
                 </div>
-                <div class="filter-group">
-                    <label>排序</label>
-                    <select id="sortBy" onchange="loadServices()">
+                <div class="filter-group" style="flex:1;min-width:120px;">
+                    <label style="font-size:0.8rem;">排序</label>
+                    <select id="sortBy" onchange="loadServices()" style="padding:4px 6px;font-size:0.8rem;">
                         <option value="">默认</option>
                         <option value="price">价格</option>
                         <option value="rating">评分</option>
                         <option value="duration">时长</option>
                         <option value="created_at">最新</option>
                     </select>
-                    <select id="sortOrder" onchange="loadServices()">
+                    <select id="sortOrder" onchange="loadServices()" style="padding:4px 6px;font-size:0.8rem;">
                         <option value="asc">升序</option>
                         <option value="desc">降序</option>
                     </select>
                 </div>
-                <button class="btn btn-outline btn-sm" onclick="clearFilters()">重置筛选</button>
+                <button class="btn btn-outline btn-sm" onclick="clearFilters()" style="font-size:0.8rem;padding:4px 10px;">重置</button>
             </div>
             
             <div class="services-grid" id="allServices">
