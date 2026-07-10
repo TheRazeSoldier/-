@@ -177,13 +177,7 @@ function navigate(page, data) {
 }
 
 function goBack() {
-    if (navigationHistory.length > 0) {
-        const prev = navigationHistory.pop();
-        const prevPage = prev.page;
-        navigateToPage(prevPage, prev.data);
-    } else {
-        navigateToDefaultPage();
-    }
+    navigateToDefaultPage();
 }
 
 function navigateToPage(page, data) {
