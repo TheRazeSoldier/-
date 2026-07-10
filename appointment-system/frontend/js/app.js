@@ -176,10 +176,6 @@ function navigate(page, data) {
     navigateToPage(page, data);
 }
 
-function goBack() {
-    navigateToDefaultPage();
-}
-
 function navigateToPage(page, data) {
     currentPage = page;
     currentPageData = data;
@@ -634,7 +630,7 @@ function loadServiceDetail(serviceId) {
             _bookingBizHours = p.business_hours || '';
             container.innerHTML = `
                 <div class="service-detail">
-                    <button class="page-back" onclick="goBack()">← 返回</button>
+                    <button class="page-back" onclick="navigateToDefaultPage()">← 返回</button>
                     <div class="service-detail-header">
                         <h1>${escHtml(s.name)}</h1>
                         <p style="color:var(--mid-gray);">${escHtml(s.description)}</p>
