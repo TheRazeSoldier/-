@@ -2063,11 +2063,19 @@ function sortReviews(serviceId, sortBy) {
     items.forEach(el => container.appendChild(el));
 }
 
+function handleHash() {
+    const hash = window.location.hash.replace('#', '');
+    if (hash === 'myAppointments' && currentUser) { navigate('myAppointments'); return true; }
+    if (hash === 'coupons' && currentUser) { navigate('coupons'); return true; }
+    return false;
+}
+window.addEventListener('hashchange', () => { handleHash(); });
+
 // ==================== Init ====================
 document.addEventListener('DOMContentLoaded', () => {
     const loggedIn = initAuth();
     if (loggedIn) {
-        navigateToDefaultPage();
+        if (!handleHash()) navigateToDefaultPage();
     } else {
         currentPage = 'home';
         loadHomePage();
