@@ -630,7 +630,7 @@ function loadServiceDetail(serviceId) {
             _bookingBizHours = p.business_hours || '';
             container.innerHTML = `
                 <div class="service-detail">
-                    <button class="page-back" onclick="navigateToDefaultPage()">← 返回</button>
+                    <button class="page-back" id="serviceDetailBackBtn">← 返回</button>
                     <div class="service-detail-header">
                         <h1>${escHtml(s.name)}</h1>
                         <p style="color:var(--mid-gray);">${escHtml(s.description)}</p>
@@ -699,6 +699,8 @@ function loadServiceDetail(serviceId) {
                     </div>
                 </div>
             `;
+            const backBtn = document.getElementById('serviceDetailBackBtn');
+            if (backBtn) backBtn.onclick = function() { navigateToDefaultPage(); };
             document.getElementById('page-serviceDetail').classList.add('active');
         }
     });
