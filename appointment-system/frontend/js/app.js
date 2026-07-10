@@ -868,10 +868,16 @@ function loadMyAppointments() {
 
 function cancelAppointment(id) {
     if (!confirm('确定要取消这个预约吗？')) return;
+    document.querySelectorAll('[onclick*="' + id + '"]').forEach(b => { b.disabled = true; b.textContent = '处理中...'; });
     api('/api/appointments/' + id + '/cancel', { method: 'POST' }).then(({ status, data }) => {
-        if (status === 200) { showToast('预约已取消', 'success'); loadMyAppointments(); }
+        if (status === 200) { showToast('预约已取消', 'success'); reloadCurrentPage(); }
         else { showToast(data.error || '取消失败', 'error'); }
     });
+}
+
+function reloadCurrentPage() {
+    if (currentPage === 'providerDashboard') loadProviderDashboard();
+    else loadMyAppointments();
 }
 
 function payAppointment(id) {
@@ -899,15 +905,17 @@ function payAppointment(id) {
 }
 
 function confirmAppointment(id) {
+    document.querySelectorAll('[onclick*="' + id + '"]').forEach(b => { b.disabled = true; b.textContent = '处理中...'; });
     api('/api/appointments/' + id + '/confirm', { method: 'POST' }).then(({ status, data }) => {
-        if (status === 200) { showToast('预约已确认', 'success'); loadMyAppointments(); }
+        if (status === 200) { showToast('预约已确认', 'success'); reloadCurrentPage(); }
         else { showToast(data.error || '确认失败', 'error'); }
     });
 }
 
 function completeAppointment(id) {
+    document.querySelectorAll('[onclick*="' + id + '"]').forEach(b => { b.disabled = true; b.textContent = '处理中...'; });
     api('/api/appointments/' + id + '/complete', { method: 'POST' }).then(({ status, data }) => {
-        if (status === 200) { showToast('服务已完成', 'success'); loadMyAppointments(); }
+        if (status === 200) { showToast('服务已完成', 'success'); reloadCurrentPage(); }
         else { showToast(data.error || '操作失败', 'error'); }
     });
 }
