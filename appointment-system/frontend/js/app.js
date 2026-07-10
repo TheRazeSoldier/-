@@ -319,22 +319,27 @@ function updateNavState() {
         userNameDisplay.textContent = currentUser.username;
         userAvatar.textContent = currentUser.username.charAt(0).toUpperCase();
         
+        const serviceHallLink = $('navServiceHall');
         if (currentUser.role === 'admin') {
             if (adminLink) adminLink.style.display = 'block';
             if (providerLink) providerLink.style.display = 'block';
             if (navProviderLink) navProviderLink.style.display = 'none';
+            if (serviceHallLink) serviceHallLink.style.display = '';
             if (appLink) appLink.style.display = 'none';
             if (providerFeatureCard) providerFeatureCard.style.display = 'none';
         } else if (currentUser.role === 'provider') {
             if (adminLink) adminLink.style.display = 'none';
             if (providerLink) providerLink.style.display = 'block';
             if (navProviderLink) navProviderLink.style.display = 'inline-block';
+            const serviceHallLink = $('navServiceHall');
+            if (serviceHallLink) serviceHallLink.style.display = 'none';
             if (appLink) appLink.style.display = 'none';
             if (providerFeatureCard) providerFeatureCard.style.display = 'flex';
         } else {
             if (adminLink) adminLink.style.display = 'none';
             if (providerLink) providerLink.style.display = 'none';
             if (navProviderLink) navProviderLink.style.display = 'none';
+            if (serviceHallLink) serviceHallLink.style.display = '';
             if (appLink) appLink.style.display = 'block';
             if (providerFeatureCard) providerFeatureCard.style.display = 'none';
         }
@@ -345,6 +350,7 @@ function updateNavState() {
         if (providerLink) providerLink.style.display = 'none';
         if (navProviderLink) navProviderLink.style.display = 'none';
         if (adminLink) adminLink.style.display = 'none';
+        if (serviceHallLink) serviceHallLink.style.display = '';
         if (appLink) appLink.style.display = 'none';
         if (providerFeatureCard) providerFeatureCard.style.display = 'none';
     }
