@@ -1158,8 +1158,8 @@ function handleProviderRegister(e) {
 let providerPollTimer = null;
 
 function toggleNav(show) {
-    const nav = document.getElementById('navbar');
-    if (nav) nav.style.display = show ? '' : 'none';
+    const links = document.getElementById('navLinks');
+    if (links) links.style.display = show ? '' : 'none';
 }
 
 async function loadProviderDashboard() {
