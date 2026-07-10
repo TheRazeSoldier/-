@@ -673,18 +673,49 @@ function loadServiceDetail(serviceId) {
                             </div>
                         </div>
                     </div>
-                    <div class="detail-section">
+                    <div class="detail-section" id="reviewSection-${s.id}">
                         <h2>用户评价 (${s.reviews ? s.reviews.length : 0})</h2>
-                        ${s.reviews && s.reviews.length > 0 ? s.reviews.map(r => `
-                            <div style="padding:16px 0;border-bottom:1px solid var(--light-gray);">
-                                <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-                                    <span style="font-weight:600;">${escHtml(r.username)}</span>
-                                    <span style="color:var(--orange);">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
-                                </div>
-                                <p style="color:var(--mid-gray);">${escHtml(r.comment) || '用户未留下评论'}</p>
-                                <span style="font-size:0.8rem;color:var(--mid-gray);">${formatDateTime(r.created_at)}</span>
+                        ${s.reviews && s.reviews.length > 0 ? `
+                        <div style="display:flex;gap:24px;margin-bottom:20px;padding:16px;background:var(--light-gray);border-radius:8px;">
+                            <div style="text-align:center;min-width:80px;">
+                                <div style="font-size:2rem;font-weight:700;color:var(--orange);">${(s.rating || 0).toFixed(1)}</div>
+                                <div style="color:var(--orange);font-size:0.85rem;">${'★'.repeat(Math.round(s.rating || 0))}${'☆'.repeat(5-Math.round(s.rating || 0))}</div>
                             </div>
-                        `).join('') : '<p style="color:var(--mid-gray);">暂无评价</p>'}
+                            <div style="flex:1;">
+                                ${[5,4,3,2,1].map(star => {
+                                    const cnt = s.reviews.filter(r => r.rating === star).length;
+                                    const pct = s.reviews.length > 0 ? (cnt / s.reviews.length * 100) : 0;
+                                    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:0.8rem;">
+                                        <span style="width:30px;text-align:right;">${star}★</span>
+                                        <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;">
+                                            <div style="height:100%;width:${pct}%;background:var(--orange);border-radius:4px;"></div>
+                                        </div>
+                                        <span style="width:30px;color:var(--mid-gray);">${cnt}</span>
+                                    </div>`;
+                                }).join('')}
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-bottom:12px;">
+                            <span style="font-size:0.85rem;color:var(--mid-gray);line-height:2;">排序：</span>
+                            <select onchange="window.sortReviews(${s.id}, this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;">
+                                <option value="newest">最新</option>
+                                <option value="highest">最高评分</option>
+                                <option value="lowest">最低评分</option>
+                            </select>
+                        </div>
+                        <div id="reviewList-${s.id}">
+                            ${[...s.reviews].sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).map(r => `
+                                <div class="review-item" data-rating="${r.rating}" data-time="${new Date(r.created_at).getTime()}" style="padding:16px 0;border-bottom:1px solid var(--light-gray);">
+                                    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                                        <span style="font-weight:600;">${escHtml(r.username)}</span>
+                                        <span style="color:var(--orange);">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span>
+                                    </div>
+                                    <p style="color:var(--mid-gray);">${escHtml(r.comment) || '用户未留下评论'}</p>
+                                    <span style="font-size:0.8rem;color:var(--mid-gray);">${formatDateTime(r.created_at)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        ` : '<p style="color:var(--mid-gray);">暂无评价</p>'}
                     </div>
                 </div>
             `;
@@ -1931,6 +1962,19 @@ function escHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+function sortReviews(serviceId, sortBy) {
+    const container = document.getElementById('reviewList-' + serviceId);
+    if (!container) return;
+    const items = Array.from(container.querySelectorAll('.review-item'));
+    items.sort((a, b) => {
+        if (sortBy === 'newest') return parseFloat(b.dataset.time) - parseFloat(a.dataset.time);
+        if (sortBy === 'highest') return parseFloat(b.dataset.rating) - parseFloat(a.dataset.rating);
+        if (sortBy === 'lowest') return parseFloat(a.dataset.rating) - parseFloat(b.dataset.rating);
+    });
+    container.innerHTML = '';
+    items.forEach(el => container.appendChild(el));
 }
 
 // ==================== Init ====================

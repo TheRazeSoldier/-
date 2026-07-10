@@ -15,9 +15,15 @@ void ReviewController::registerRoutes(httplib::Server& svr) {
         
         models::Review review{};
         review.user_id = authUser.userId;
-        review.service_id = body["service_id"];
-        review.provider_id = body["provider_id"];
         review.appointment_id = body.contains("appointment_id") ? body["appointment_id"].get<int>() : 0;
+        if (review.appointment_id > 0) {
+            auto appt = db.getAppointmentById(review.appointment_id);
+            review.service_id = appt.service_id;
+            review.provider_id = appt.provider_id;
+        } else {
+            review.service_id = body.contains("service_id") ? body["service_id"].get<int>() : 0;
+            review.provider_id = body.contains("provider_id") ? body["provider_id"].get<int>() : 0;
+        }
         review.rating = body["rating"];
         review.comment = body.contains("comment") ? body["comment"] : "";
         
