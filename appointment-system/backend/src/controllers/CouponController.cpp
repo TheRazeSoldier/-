@@ -194,7 +194,7 @@ void CouponController::registerRoutes(httplib::Server& svr) {
                 });
             }
         }
-        res.set_content(result.dump(), "application/json");
+        res.set_content(json{{"user_coupons", result}}.dump(), "application/json");
     });
 
     svr.Post(R"(/api/coupons/user/(\d+)/use)", [](const httplib::Request& req, httplib::Response& res) {

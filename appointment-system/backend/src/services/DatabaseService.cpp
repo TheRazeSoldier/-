@@ -1811,9 +1811,20 @@ std::vector<models::Coupon> DatabaseService::getAvailableCoupons(int providerId)
 int DatabaseService::claimCoupon(int userId, int couponId) {
     std::lock_guard<std::mutex> lock(mutex_);
     
-    auto coupon = getCouponById(couponId);
-    if (coupon.id == 0 || coupon.status != "active" || coupon.used_count >= coupon.total_count) {
-        return -1;
+    int providerId = 0;
+    {
+        const char* sqlC = "SELECT provider_id, status, used_count, total_count FROM coupons WHERE id = ?;";
+        sqlite3_stmt* stmtC;
+        if (sqlite3_prepare_v2(db_, sqlC, -1, &stmtC, nullptr) != SQLITE_OK) return -1;
+        sqlite3_bind_int(stmtC, 1, couponId);
+        if (sqlite3_step(stmtC) == SQLITE_ROW) {
+            std::string status = (const char*)sqlite3_column_text(stmtC, 1);
+            int used = sqlite3_column_int(stmtC, 2);
+            int total = sqlite3_column_int(stmtC, 3);
+            if (status != "active" || used >= total) { sqlite3_finalize(stmtC); return -1; }
+            providerId = sqlite3_column_int(stmtC, 0);
+        } else { sqlite3_finalize(stmtC); return -1; }
+        sqlite3_finalize(stmtC);
     }
     
     const char* sqlCheck = "SELECT COUNT(*) FROM user_coupons WHERE user_id = ? AND coupon_id = ? AND status = 'unused';";
@@ -1834,7 +1845,7 @@ int DatabaseService::claimCoupon(int userId, int couponId) {
     
     sqlite3_bind_int(stmt, 1, userId);
     sqlite3_bind_int(stmt, 2, couponId);
-    sqlite3_bind_int(stmt, 3, coupon.provider_id);
+    sqlite3_bind_int(stmt, 3, providerId);
     
     int result = -1;
     if (sqlite3_step(stmt) == SQLITE_DONE) {

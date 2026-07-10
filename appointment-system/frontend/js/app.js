@@ -312,6 +312,7 @@ function updateNavState() {
     const adminLink = $('adminLink');
     const appLink = $('appLink');
     const providerFeatureCard = $('providerFeatureCard');
+    const dashReportsCard = $('dashReportsCard');
     
     if (currentUser) {
         navActions.style.display = 'none';
@@ -335,6 +336,7 @@ function updateNavState() {
             if (serviceHallLink) serviceHallLink.style.display = 'none';
             if (appLink) appLink.style.display = 'none';
             if (providerFeatureCard) providerFeatureCard.style.display = 'flex';
+            if (dashReportsCard) dashReportsCard.style.display = 'block';
         } else {
             if (adminLink) adminLink.style.display = 'none';
             if (providerLink) providerLink.style.display = 'none';
@@ -342,6 +344,7 @@ function updateNavState() {
             if (serviceHallLink) serviceHallLink.style.display = '';
             if (appLink) appLink.style.display = 'block';
             if (providerFeatureCard) providerFeatureCard.style.display = 'none';
+            if (dashReportsCard) dashReportsCard.style.display = 'none';
         }
         loadUnreadCount();
     } else {
